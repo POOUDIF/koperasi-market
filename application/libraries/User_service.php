@@ -110,6 +110,37 @@ class User_service {
         return $user;
     }
 
+    /**
+     * Kirim ulang OTP verifikasi (usulan perbaikan CACAT-06 di README — belum
+     * ada di blueprint asli). Sebelum ini, anggota yang OTP-nya kedaluwarsa
+     * harus dibantu manual lewat DB.
+     *
+     * Balasan dari controller SELALU generik terlepas dari hasil di sini —
+     * padanan pola anti-enumerasi yang sudah dipakai login() (dummy hash saat
+     * email tidak ditemukan). Method ini sengaja tidak melempar apa pun untuk
+     * kasus "email tidak ada" / "sudah terverifikasi", supaya penyerang tidak
+     * bisa membedakan ketiga kondisi dari response.
+     */
+    public function resend_otp($email) {
+        $user = $this->CI->User_model->find_by_email($email);
+
+        if ($user === NULL || $this->CI->User_model->truthy($user['is_email_verified'])) {
+            return;
+        }
+
+        $otp = $this->generate_otp();
+
+        try {
+            $this->CI->redisx->setex('otp:' . $email,
+                (int) $this->CI->config->item('otp_ttl_seconds'), $otp);
+        } catch (Throwable $e) {
+            log_message('error', '[resend_otp] gagal menyimpan OTP: ' . $e->getMessage());
+            throw Api_exception::server();
+        }
+
+        $this->CI->email_service->send_otp($email, $otp);
+    }
+
     /** FLOW-04 Logout — blocklist token sampai masa berlakunya habis (§11.4). */
     public function logout($raw_token) {
         try {

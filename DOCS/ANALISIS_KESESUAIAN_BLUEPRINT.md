@@ -205,7 +205,7 @@ ada gap skema, murni gap kode worker + integrasi blockchain.
 | # | Cacat | Status | Bukti |
 |---|---|---|---|
 | 01 | Jual emas tanpa cek kepemilikan (KRITIS) | ✅ Diperbaiki | `Gold_model::sell_with_credit()` — `net_holding()` dalam transaction setelah lock |
-| 02 | Mint gagal tidak refund (KRITIS) | ⚠️ Sebagian | Fungsi refund ada & atomik, tapi **tidak ada pemanggil** (worker belum ada) |
+| 02 | Mint gagal tidak refund (KRITIS) | ✅ Diperbaiki (2026-09-01) | `Gold_worker::_process()` memanggil `refund_failed_transaction()` saat mint gagal, diuji nyata lewat CLI |
 | 03 | Admin group tidak cek status akun | ✅ Diperbaiki | `Admin_Controller extends Auth_Controller` mewarisi cek status |
 | 04 | Approve setoran 2 transaction terpisah | ✅ Diperbaiki | Satu transaction + `FOR UPDATE` pada baris permohonan |
 | 05 | Review pembiayaan rawan double-approve | ✅ Diperbaiki | `WHERE status='pending'` + `affected_rows` check |
@@ -215,7 +215,7 @@ ada gap skema, murni gap kode worker + integrasi blockchain.
 | 09 | Endpoint admin tanpa paginasi | ✅ Diperbaiki | `paging()` di semua endpoint admin/list |
 | 10 | Blocklist JWT pakai token utuh | ✅ Diperbaiki | `sha256(token)` sebagai key |
 | 11 | Status `active` financing tak pernah dipakai (kosmetik) | ❌ Belum | Masih ada di ENUM skema, tidak pernah ditransisikan ke status itu — blueprint sendiri menyerahkan ini ke keputusan pengembang |
-| 12 | Tidak ada endpoint withdraw | ❌ Belum | Tidak ada di peta endpoint README/routes.php |
+| 12 | Tidak ada endpoint withdraw | ✅ Diperbaiki (2026-09-01) | `POST /savings/withdraw` + alur persetujuan admin (`withdraw_requests`, pola sama dengan deposit), diuji end-to-end |
 
 ---
 
@@ -236,16 +236,21 @@ benar-benar ada. Tambahan 3 endpoint terdokumentasi README: `GET /savings/produc
 | 3 — KYC | ✅ Selesai |
 | 4 — Pembiayaan | ✅ Selesai |
 | 5 — Emas off-chain | ✅ Selesai |
-| 6 — Worker & blockchain | ❌ **Belum** |
-| 7 — Admin & pengerasan | ⚠️ Sebagian (paginasi ✅, harga emas ✅, rate limit ✅; logging terstruktur & `display_errors=Off` produksi ❌) |
+| 6 — Worker & blockchain | ✅ Selesai (2026-09-01) — lihat Modul 6 di atas |
+| 7 — Admin & pengerasan | ✅ Selesai (2026-09-01) — paginasi ✅, harga emas ✅, rate limit ✅, logging terstruktur ✅ (`MY_Log`, JSON per baris), `display_errors=Off` produksi ✅ (`APP_ENV` kini benar-benar mengontrol `ENVIRONMENT` CI3) |
 
 ### Pengujian (§22)
-- `tests/smoke_test.sh`: 63 assertion, mencakup **semua 23 langkah** skenario manual blueprint §22.
+- `tests/smoke_test.sh`: **76 assertion** (63 asli + 13 baru untuk withdraw & resend-otp, 2026-09-01),
+  mencakup **semua 23 langkah** skenario manual blueprint §22 plus alur withdraw (CACAT-12) dan
+  resend-otp. Dijalankan ulang penuh setelah semua perubahan hari ini: **76 lulus, 0 gagal**.
 - `tests/concurrency_test.sh`: 11 assertion, mencakup **4 skenario** (melebihi 2 contoh eksplisit
   blueprint — ditambah double-approve setoran dan double-sell emas).
-- **Tidak tercakup**: "Verifikasi integritas buku besar" (§22, baris 3527-3552) sebagai cron job
-  harian — tidak ditemukan file/scheduled job untuk ini. Gap operasional, konsisten dengan Fase 6
-  yang belum ada (poin "transaksi emas menggantung >1 jam" baru relevan setelah ada worker).
+- **✅ Diperbaiki (2026-09-01)**: "Verifikasi integritas buku besar" (§22, baris 3527-3552) kini ada
+  sebagai `php index.php cli/ledger_audit run` (exit code 1 bila ada anomali, siap dijadwalkan cron
+  harian). Diuji nyata terhadap database dev — berhasil mendeteksi anomali `savings_accounts.balance`
+  vs ledger yang **sudah ada sebelumnya** di data dev (ternyata artefak `tests/concurrency_test.sh`
+  baris 110 yang sengaja meng-`UPDATE balance` langsung lewat SQL untuk menyiapkan skenario race-
+  condition, melewati ledger — bukan bug kode, tapi bukti bahwa alat audit ini bekerja dengan benar).
 
 Semua klaim kuantitatif README ("27 endpoint", "63 uji fungsional", "11 uji konkurensi") **terverifikasi akurat**.
 

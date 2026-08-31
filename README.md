@@ -99,6 +99,7 @@ satu instance akan menyerialkan request dan uji itu jadi tidak berarti.
 | POST | `/api/v1/register` | rate-limit |
 | POST | `/api/v1/login` | rate-limit |
 | POST | `/api/v1/verify-email` | rate-limit |
+| POST | `/api/v1/resend-otp` | rate-limit |
 | GET | `/api/v1/gold/price` | — |
 | POST | `/api/v1/logout` | JWT |
 | GET | `/api/v1/profile` | JWT |
@@ -107,6 +108,8 @@ satu instance akan menyerialkan request dan uji itu jadi tidak berarti.
 | GET | `/api/v1/savings/products` | JWT |
 | POST | `/api/v1/savings/deposit` | JWT |
 | GET | `/api/v1/savings/deposit-requests` | JWT |
+| POST | `/api/v1/savings/withdraw` | JWT |
+| GET | `/api/v1/savings/withdraw-requests` | JWT |
 | POST | `/api/v1/financing/apply` | JWT |
 | GET | `/api/v1/financing` | JWT |
 | GET | `/api/v1/financing/:id/installments` | JWT |
@@ -116,12 +119,36 @@ satu instance akan menyerialkan request dan uji itu jadi tidak berarti.
 | PUT | `/api/v1/admin/financing/:id/review` | pengurus+ |
 | PUT | `/api/v1/admin/savings/deposit-requests/:id/review` | pengurus+ |
 | GET | `/api/v1/admin/savings/deposit-requests` | pengurus+ |
+| PUT | `/api/v1/admin/savings/withdraw-requests/:id/review` | pengurus+ |
+| GET | `/api/v1/admin/savings/withdraw-requests` | pengurus+ |
 | GET | `/api/v1/admin/users` | pengurus+ |
 | GET | `/api/v1/admin/transactions/{financing,gold,saving}` | pengurus+ |
 | POST | `/api/v1/admin/gold/price` | pengurus+ |
 
-Tiga di antaranya (`/savings/products`, `/gold/holding`, `/admin/gold/price`)
-tidak ada di sistem Go; sisanya sepadan 1:1.
+Tujuh di antaranya (`/resend-otp`, `/savings/products`, `/savings/withdraw`,
+`/savings/withdraw-requests`, `/gold/holding`, `/admin/gold/price`,
+`/admin/savings/withdraw-requests[/:id/review]`) tidak ada di sistem Go;
+sisanya sepadan 1:1. `/savings/withdraw` memperbaiki CACAT-12 (§20 blueprint)
+dan `/resend-otp` merealisasikan usulan perbaikan CACAT-06.
+
+## Operasional: worker, audit, dan CLI (Fase 6-7)
+
+```bash
+# Worker emas (Fase 6) — jalankan sebagai proses long-running di bawah
+# Supervisor/NSSM, plus cron 5 menit untuk recover:
+php index.php cli/gold_worker start      # loop BLPOP tanpa henti
+php index.php cli/gold_worker recover    # requeue pending + cek receipt (cron 5 menit)
+php index.php cli/gold_worker once 42    # proses satu ID (debugging)
+
+# Signer service terpisah (Opsi 2, §16.4) — memegang OWNER_PRIVATE_KEY,
+# TIDAK pernah dibaca oleh proses PHP:
+cd signer-service && cp .env.example .env   # isi RPC/private key/alamat kontrak
+npm install && npm start
+
+# Verifikasi integritas buku besar (§22) — jadwalkan harian via cron/Task
+# Scheduler; exit code 1 bila ada anomali:
+php index.php cli/ledger_audit run
+```
 
 ---
 

@@ -61,6 +61,27 @@ class Auth extends API_Controller {
         });
     }
 
+    /**
+     * POST /api/v1/resend-otp — usulan perbaikan CACAT-06 (README), belum ada
+     * di blueprint asli. Balasan SELALU generik: tidak membocorkan apakah
+     * email terdaftar atau sudah terverifikasi (lihat User_service::resend_otp).
+     */
+    public function resend_otp() {
+        $this->run(function () {
+            $this->ratelimit->check('auth');
+
+            $in = $this->validator->check($this->body, array(
+                'email' => array('required', 'email'),
+            ));
+
+            $this->user_service->resend_otp($in['email']);
+
+            return $this->ok(array(
+                'message' => 'jika email terdaftar dan belum diverifikasi, OTP baru telah dikirim',
+            ), 200);
+        });
+    }
+
     /** POST /api/v1/login */
     public function login() {
         $this->run(function () {

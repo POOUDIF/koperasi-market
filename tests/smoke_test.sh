@@ -70,6 +70,15 @@ check "password < 8 karakter -> 400" "$c" "400"
 c=$(code POST /login "{\"email\":\"$MEMBER\",\"password\":\"$PW\"}")
 check "login sebelum verifikasi -> 403" "$c" "403"
 
+# resend-otp (usulan perbaikan CACAT-06, belum ada di blueprint asli)
+FIRST_OTP=$(otp_for "$MEMBER")
+c=$(code POST /resend-otp "{\"email\":\"$MEMBER\"}")
+check "resend-otp email terdaftar -> 200" "$c" "200"
+c=$(code POST /resend-otp '{"email":"tidak-terdaftar-xyz@mail.com"}')
+check "resend-otp email tidak terdaftar -> tetap 200 (anti-enumerasi)" "$c" "200"
+c=$(code POST /verify-email "{\"email\":\"$MEMBER\",\"otp\":\"$FIRST_OTP\"}")
+check "  OTP lama tertimpa oleh resend -> 400" "$c" "400"
+
 OTP=$(otp_for "$MEMBER")
 check "OTP tersimulasi di log (6 digit)" "$(printf '%s' "$OTP" | wc -c | tr -d ' ')" "6"
 
@@ -145,6 +154,39 @@ check "approve kedua kali -> 422" "$c" "422"
 c=$(code GET /savings/accounts "" "$TOKEN")
 BAL=$(printf '%s' "$(body)" | sed -n 's/.*"id":'"$ACC"',[^}]*"balance":\([0-9.]*\).*/\1/p')
 check "saldo bertambah jadi 5.000.000" "$BAL" "5000000"
+
+# --- Fase 6b: penarikan (withdraw) — perbaikan CACAT-12 ---------------
+echo "-- Fase 6b: penarikan dana (CACAT-12)"
+c=$(code POST /savings/withdraw "{\"account_id\":$ACC,\"amount\":99000000,\"destination_account\":\"BCA-000111222\"}" "$TOKEN")
+check "withdraw melebihi saldo -> 422" "$c" "422"
+
+c=$(code POST /savings/withdraw "{\"account_id\":999999,\"amount\":1000,\"destination_account\":\"BCA-000111222\"}" "$TOKEN")
+check "withdraw dari rekening asing -> 404" "$c" "404"
+
+c=$(code POST /savings/withdraw "{\"account_id\":$ACC,\"amount\":2000000,\"destination_account\":\"BCA-000111222\",\"reference_id\":\"WD-SMOKE-1\"}" "$TOKEN")
+check "ajukan withdraw 2.000.000 -> 201" "$c" "201"
+WREQ=$(jval "$(body)" id)
+check "  status awal pending" "$(jval "$(body)" status)" "pending"
+
+c=$(code GET /savings/withdraw-requests "" "$TOKEN")
+check "GET /savings/withdraw-requests -> 200" "$c" "200"
+
+c=$(code PUT "/admin/savings/withdraw-requests/$WREQ/review" '{"action":"approve"}' "$ADMIN_TOKEN")
+check "admin approve withdraw -> 200" "$c" "200"
+
+c=$(code PUT "/admin/savings/withdraw-requests/$WREQ/review" '{"action":"approve"}' "$ADMIN_TOKEN")
+check "approve kedua kali -> 422" "$c" "422"
+
+c=$(code GET /savings/accounts "" "$TOKEN")
+BAL=$(printf '%s' "$(body)" | sed -n 's/.*"id":'"$ACC"',[^}]*"balance":\([0-9.]*\).*/\1/p')
+check "saldo berkurang jadi 3.000.000 setelah withdraw" "$BAL" "3000000"
+
+LEDGER=$("$MYSQL" -u root -h 127.0.0.1 koperasi_digital -N -B \
+  -e "SELECT COUNT(*) FROM savings_transactions WHERE reference_id='WD-SMOKE-1' AND type='withdraw';" 2>/dev/null)
+check "  ledger 'WD-SMOKE-1' bertipe withdraw tercatat" "$LEDGER" "1"
+
+c=$(code GET /admin/savings/withdraw-requests "" "$ADMIN_TOKEN")
+check "admin GET /admin/savings/withdraw-requests -> 200" "$c" "200"
 
 # --- Fase 3: KYC ------------------------------------------------------
 echo "-- Fase 3: KYC"

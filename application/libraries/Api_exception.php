@@ -40,6 +40,10 @@ class Api_exception extends Exception {
     public static function depositRequestNotFound() { return new self('DEPOSIT_REQUEST_NOT_FOUND', 'permohonan setoran tidak ditemukan', 404); }
     public static function depositAlreadyReviewed() { return new self('DEPOSIT_ALREADY_REVIEWED', 'permohonan setoran sudah direview sebelumnya', 422); }
 
+    /* ---------- Penarikan (CACAT-12) ---------- */
+    public static function withdrawRequestNotFound() { return new self('WITHDRAW_REQUEST_NOT_FOUND', 'permohonan penarikan tidak ditemukan', 404); }
+    public static function withdrawAlreadyReviewed() { return new self('WITHDRAW_ALREADY_REVIEWED', 'permohonan penarikan sudah direview sebelumnya', 422); }
+
     /* ---------- Pembiayaan ---------- */
     public static function financingNotFound()      { return new self('FINANCING_NOT_FOUND', 'pengajuan pembiayaan tidak ditemukan', 404); }
     public static function financingNotPending()    { return new self('FINANCING_NOT_PENDING', 'pengajuan sudah pernah diproses sebelumnya', 409); }

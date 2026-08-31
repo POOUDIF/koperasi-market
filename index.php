@@ -53,7 +53,20 @@
  *
  * NOTE: If you change these, also change the error_reporting() code below
  */
-	define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
+
+// Muat .env sedini mungkin (§21 Fase 7) — sebelum perubahan ini, APP_ENV di
+// .env tidak berpengaruh sama sekali ke ENVIRONMENT/display_errors: satu-
+// satunya jalan mematikannya adalah menyetel CI_ENV terpisah di level OS/web
+// server, yang gampang terlewat saat deploy. CI_ENV tetap diprioritaskan bila
+// memang diset eksplisit (mis. lewat konfigurasi web server produksi).
+if (is_file(__DIR__ . '/vendor/autoload.php')) {
+	require_once __DIR__ . '/vendor/autoload.php';
+	if (is_file(__DIR__ . '/.env') && class_exists('Dotenv\\Dotenv')) {
+		Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+	}
+}
+
+	define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : (getenv('APP_ENV') ?: 'development'));
 
 /*
  *---------------------------------------------------------------

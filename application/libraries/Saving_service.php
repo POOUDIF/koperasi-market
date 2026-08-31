@@ -10,7 +10,7 @@ class Saving_service {
 
     public function __construct() {
         $this->CI =& get_instance();
-        $this->CI->load->model(array('Saving_model', 'Deposit_request_model'));
+        $this->CI->load->model(array('Saving_model', 'Deposit_request_model', 'Withdraw_request_model'));
     }
 
     /**
@@ -71,5 +71,40 @@ class Saving_service {
     /** FLOW-11 Verifikasi setoran oleh admin (§13.4) — satu transaction. */
     public function review_deposit($admin_id, $request_id, $action) {
         return $this->CI->Deposit_request_model->review($admin_id, $request_id, $action);
+    }
+
+    /**
+     * Ajukan penarikan (CACAT-12) — analog request_deposit(), tapi arah
+     * uangnya terbalik: endpoint ini TIDAK mengurangi saldo, hanya membuat
+     * permohonan `pending` yang menunggu verifikasi admin.
+     */
+    public function request_withdraw($user_id, array $in) {
+        $acc = $this->CI->Saving_model->get_account_by_id((int) $in['account_id']);
+
+        if ($acc === NULL)                            throw Api_exception::savingsAccountNotFound();
+        // 404, bukan 403 — jangan biarkan ID rekening orang lain dienumerasi.
+        if ((int) $acc['user_id'] !== (int) $user_id) throw Api_exception::savingsAccountNotFound();
+        if ($acc['status'] !== 'active')              throw Api_exception::accountNotActive();
+
+        // Pengecekan lunak: hanya menolak permohonan yang jelas tidak masuk akal
+        // secepat mungkin. Pengecekan yang MENGIKAT ada lagi di
+        // Withdraw_request_model::review(), SETELAH baris rekening terkunci,
+        // karena saldo bisa berubah di antara pengajuan dan persetujuan admin.
+        if (Money::lt($acc['balance'], $in['amount'])) {
+            throw Api_exception::insufficientBalance();
+        }
+
+        return $this->CI->Withdraw_request_model->insert(array(
+            'user_id'             => $user_id,
+            'savings_account_id'  => (int) $in['account_id'],
+            'amount'              => $in['amount'],
+            'destination_account' => $in['destination_account'],
+            'reference_id'        => $in['reference_id'],
+        ));
+    }
+
+    /** Verifikasi penarikan oleh admin — satu transaction. */
+    public function review_withdraw($admin_id, $request_id, $action) {
+        return $this->CI->Withdraw_request_model->review($admin_id, $request_id, $action);
     }
 }

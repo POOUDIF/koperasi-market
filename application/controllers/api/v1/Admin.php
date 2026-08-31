@@ -17,7 +17,7 @@ class Admin extends Admin_Controller {
     public function __construct() {
         parent::__construct();
         $this->load->library(array('Saving_service', 'Financing_service', 'Gold_service'));
-        $this->load->model(array('Saving_model', 'Deposit_request_model',
+        $this->load->model(array('Saving_model', 'Deposit_request_model', 'Withdraw_request_model',
                                  'Financing_model', 'Gold_model'));
     }
 
@@ -56,6 +56,24 @@ class Admin extends Admin_Controller {
             return $this->ok(array(
                 'message'         => 'review setoran berhasil disimpan',
                 'deposit_request' => $this->Deposit_request_model->find($request_id),
+            ), 200);
+        });
+    }
+
+    /** PUT /api/v1/admin/savings/withdraw-requests/:id/review — perbaikan CACAT-12. */
+    public function review_withdraw($id = NULL) {
+        $this->run(function () use ($id) {
+            $request_id = $this->param_id($id, 'request_id');
+
+            $in = $this->validator->check($this->body, array(
+                'action' => array('required', 'in:approve,reject'),
+            ));
+
+            $this->saving_service->review_withdraw($this->user_id, $request_id, $in['action']);
+
+            return $this->ok(array(
+                'message'          => 'review penarikan berhasil disimpan',
+                'withdraw_request' => $this->Withdraw_request_model->find($request_id),
             ), 200);
         });
     }
@@ -124,6 +142,27 @@ class Admin extends Admin_Controller {
                 'page'     => $pg['page'],
                 'per_page' => $pg['per_page'],
                 'total'    => $this->Deposit_request_model->count_all($status),
+            ), 200);
+        });
+    }
+
+    /** GET /api/v1/admin/savings/withdraw-requests?status=pending */
+    public function withdraw_requests() {
+        $this->run(function () {
+            $pg     = $this->paging();
+            $status = $this->input->get('status');
+
+            if ($status !== NULL && $status !== ''
+                && ! in_array($status, array('pending', 'approved', 'rejected'), TRUE)) {
+                throw Api_exception::badRequest("parameter 'status' tidak valid");
+            }
+
+            return $this->ok(array(
+                'withdraw_requests' => $this->Withdraw_request_model->get_all_paged(
+                    $pg['per_page'], $pg['offset'], $status),
+                'page'     => $pg['page'],
+                'per_page' => $pg['per_page'],
+                'total'    => $this->Withdraw_request_model->count_all($status),
             ), 200);
         });
     }
