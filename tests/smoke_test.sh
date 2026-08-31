@@ -163,7 +163,7 @@ check "withdraw melebihi saldo -> 422" "$c" "422"
 c=$(code POST /savings/withdraw "{\"account_id\":999999,\"amount\":1000,\"destination_account\":\"BCA-000111222\"}" "$TOKEN")
 check "withdraw dari rekening asing -> 404" "$c" "404"
 
-c=$(code POST /savings/withdraw "{\"account_id\":$ACC,\"amount\":2000000,\"destination_account\":\"BCA-000111222\",\"reference_id\":\"WD-SMOKE-1\"}" "$TOKEN")
+c=$(code POST /savings/withdraw "{\"account_id\":$ACC,\"amount\":2000000,\"destination_account\":\"BCA-000111222\",\"reference_id\":\"WD-SMOKE-$STAMP\"}" "$TOKEN")
 check "ajukan withdraw 2.000.000 -> 201" "$c" "201"
 WREQ=$(jval "$(body)" id)
 check "  status awal pending" "$(jval "$(body)" status)" "pending"
@@ -182,8 +182,8 @@ BAL=$(printf '%s' "$(body)" | sed -n 's/.*"id":'"$ACC"',[^}]*"balance":\([0-9.]*
 check "saldo berkurang jadi 3.000.000 setelah withdraw" "$BAL" "3000000"
 
 LEDGER=$("$MYSQL" -u root -h 127.0.0.1 koperasi_digital -N -B \
-  -e "SELECT COUNT(*) FROM savings_transactions WHERE reference_id='WD-SMOKE-1' AND type='withdraw';" 2>/dev/null)
-check "  ledger 'WD-SMOKE-1' bertipe withdraw tercatat" "$LEDGER" "1"
+  -e "SELECT COUNT(*) FROM savings_transactions WHERE reference_id='WD-SMOKE-$STAMP' AND type='withdraw';" 2>/dev/null)
+check "  ledger 'WD-SMOKE-$STAMP' bertipe withdraw tercatat" "$LEDGER" "1"
 
 c=$(code GET /admin/savings/withdraw-requests "" "$ADMIN_TOKEN")
 check "admin GET /admin/savings/withdraw-requests -> 200" "$c" "200"

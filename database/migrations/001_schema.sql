@@ -116,7 +116,10 @@ CREATE TABLE IF NOT EXISTS financing (
   margin_amount    DECIMAL(19,4) NOT NULL,
   total_payable    DECIMAL(19,4) NOT NULL,
   duration_months  INT NOT NULL,
-  status           ENUM('pending','approved','active','paid','rejected') NOT NULL DEFAULT 'pending',
+  -- CACAT-11: 'active' dihapus dari daftar status — kode hanya pernah
+  -- mentransisikan pending->approved->paid (atau ->rejected). Tidak ada
+  -- tahap pencairan dana terpisah yang memakainya.
+  status           ENUM('pending','approved','paid','rejected') NOT NULL DEFAULT 'pending',
   reviewed_by      BIGINT UNSIGNED NULL,
   reviewed_at      TIMESTAMP NULL DEFAULT NULL,
   created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

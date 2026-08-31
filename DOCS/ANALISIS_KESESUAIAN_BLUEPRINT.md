@@ -214,7 +214,7 @@ ada gap skema, murni gap kode worker + integrasi blockchain.
 | 08 | Tidak ada endpoint harga emas | ✅ Diperbaiki | `POST /admin/gold/price` + invalidasi cache |
 | 09 | Endpoint admin tanpa paginasi | ✅ Diperbaiki | `paging()` di semua endpoint admin/list |
 | 10 | Blocklist JWT pakai token utuh | ✅ Diperbaiki | `sha256(token)` sebagai key |
-| 11 | Status `active` financing tak pernah dipakai (kosmetik) | ❌ Belum | Masih ada di ENUM skema, tidak pernah ditransisikan ke status itu — blueprint sendiri menyerahkan ini ke keputusan pengembang |
+| 11 | Status `active` financing tak pernah dipakai (kosmetik) | ✅ Diperbaiki (2026-09-01) | `'active'` dihapus dari ENUM `financing.status` (migrasi `004_financing_drop_active_status.sql`), setelah dikonfirmasi 0 baris memakainya |
 | 12 | Tidak ada endpoint withdraw | ✅ Diperbaiki (2026-09-01) | `POST /savings/withdraw` + alur persetujuan admin (`withdraw_requests`, pola sama dengan deposit), diuji end-to-end |
 
 ---
@@ -268,7 +268,9 @@ Semua klaim kuantitatif README ("27 endpoint", "63 uji fungsional", "11 uji konk
 3. **Verifikasi integritas buku besar (§22)**: jadikan cron/scheduled job, terutama setelah worker
    emas ada (deteksi transaksi menggantung).
 4. **Fase 7 sisanya**: logging terstruktur, `display_errors=Off` untuk produksi.
-5. **CACAT-12** (endpoint withdraw) dan **resend-otp**: masih belum ada — putuskan apakah masuk
-   cakupan proyek saat ini atau didokumentasikan sebagai out-of-scope resmi.
-6. CACAT-11 (status `active` financing tak terpakai) bersifat kosmetik, bisa diabaikan atau
-   dibersihkan dari ENUM jika tidak akan dipakai.
+5. ✅ **CACAT-12** (endpoint withdraw) dan **resend-otp**: **selesai (2026-09-01)**.
+6. ✅ **CACAT-11** (status `active` financing tak terpakai): **selesai (2026-09-01)** — dihapus dari ENUM.
+
+**Semua rekomendasi di atas sudah dieksekusi.** Sisa pekerjaan opsional di luar cakupan blueprint:
+sambungkan `signer-service/` ke kontrak CoopGold yang benar-benar di-deploy (butuh ABI asli dan
+private key wallet minter) sebelum fitur beli emas dipakai untuk transaksi produksi sungguhan.
