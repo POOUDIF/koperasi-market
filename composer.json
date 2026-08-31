@@ -1,0 +1,22 @@
+{
+    "name": "koperasi/market",
+    "description": "Koperasi Syariah Digital - REST API (CodeIgniter 3 + PHP 7.4)",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.4",
+        "ext-bcmath": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "firebase/php-jwt": "^6.0",
+        "predis/predis": "^2.0",
+        "phpmailer/phpmailer": "^6.8",
+        "vlucas/phpdotenv": "^5.4"
+    },
+    "config": {
+        "platform": {
+            "php": "7.4.33"
+        },
+        "process-timeout": 0
+    }
+}
