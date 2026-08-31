@@ -1,0 +1,15 @@
+{
+  "name": "koperasi-gold-signer",
+  "version": "1.0.0",
+  "description": "Signer service terpisah untuk mint token CoopGold (§16.4 Opsi 2 blueprint). Satu-satunya proses yang boleh memegang OWNER_PRIVATE_KEY.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "express": "^4.19.2"
+  }
+}

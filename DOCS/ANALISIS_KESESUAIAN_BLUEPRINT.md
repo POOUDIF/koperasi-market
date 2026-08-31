@@ -42,10 +42,18 @@ teks blueprint literal adalah perbaikan cacat yang disengaja dan sudah didokumen
   (`application/config/config.php`), seluruh struktur direktori inti (`core/`, `libraries/`,
   `models/`, `controllers/api/v1/`).
 - **Deviasi terdokumentasi**: ekstensi `mysqli` bukan `pgsql`/`pdo_pgsql` (README).
-- **Hilang**: `application/libraries/Chain_client.php` dan `application/controllers/cli/Gold_worker.php`
-  — **tidak ada sama sekali**, dikonfirmasi via `Glob` langsung ke filesystem (bukan cuma README).
-  Variabel `.env` `POLYGON_RPC_URL` dan `OWNER_PRIVATE_KEY` juga tidak ada — konsisten dengan Fase 6
-  yang belum dikerjakan.
+- **✅ Diperbaiki (2026-09-01)**: `application/libraries/Chain_client.php` dan
+  `application/controllers/cli/Gold_worker.php` sudah dibuat dan diuji jalan (`once`/`recover`
+  terverifikasi lewat CLI nyata, termasuk auto-refund saat `wallet_address` kosong). `Chain_client`
+  memakai Opsi 2 blueprint (§16.4) — signer service Node.js terpisah di `signer-service/`, dijaga
+  agar `OWNER_PRIVATE_KEY` **tidak pernah** masuk ke `.env` aplikasi CI3 ini (sesuai peringatan
+  keamanan eksplisit blueprint), hanya ke `signer-service/.env` miliknya sendiri. Selama
+  `signer-service` belum dijalankan dengan kontrak nyata (`SIGNER_SERVICE_URL`/`GOLD_CONTRACT_ADDRESS`
+  kosong), worker berjalan aman di mode log-only — transaksi tetap `pending` dan di-requeue otomatis
+  oleh `recover()`, bukan macet permanen seperti sebelumnya.
+  **Catatan jujur**: `signer-service/server.js` adalah scaffold Opsi 2 (Express + ethers.js v6) yang
+  belum pernah dites terhadap kontrak blockchain sungguhan — ABI-nya placeholder dan wajib diganti
+  dengan ABI hasil compile kontrak CoopGold yang benar-benar di-deploy sebelum dipakai produksi.
 - **Deviasi wajar tak terdokumentasi**: migrasi dikonsolidasi jadi `001_schema.sql` + `002_seed.sql`
   (bukan 10 file terpisah per tabel seperti blueprint); ada tambahan `MY_Model.php` dan
   `Notfound.php` (untuk `404_override`) yang tidak disebut blueprint tapi memperkuat struktur.
@@ -87,9 +95,15 @@ handling, `insert_id()`, `Email_service` — **sesuai dan pada beberapa titik me
 - Dari 11 jebakan migrasi (§19.1–19.11): **9 sesuai** (presisi uang, boolean, decimal-as-string,
   defer-rollback, month-addition, `random_int`, header Authorization, `exit` di `fail()`, connection
   pool dicatat di README). **2 belum diverifikasi/belum ada**:
-  - §19.4 (tidak ada goroutine, RPC blockchain harus async) — belum relevan karena worker belum ada.
-  - §19.7 (timeout request eksplisit / `max_execution_time`) — **tidak ditemukan** dikonfigurasi di
-    manapun dalam kode proyek; kemungkinan bagian dari "Fase 7 sisanya" yang README akui belum selesai.
+  - §19.4 (tidak ada goroutine, RPC blockchain harus async) — **✅ diikuti** oleh desain
+    `Gold_worker` yang dibangun (Pilihan A §16.2: kirim transaksi lalu keluar, tidak menunggu
+    receipt sinkron di loop utama; `_check_receipt()` dijalankan terpisah lewat `recover()`).
+  - §19.7 (timeout request eksplisit / `max_execution_time`) — **✅ Diperbaiki (2026-09-01)**:
+    `application/config/config.php` kini memanggil `ini_set('max_execution_time', 15)` untuk SAPI
+    non-CLI (worker CLI tetap `set_time_limit(0)` seperti disyaratkan). Verifikasi: server dev tetap
+    merespons `/api/v1/health` normal setelah perubahan. Konfigurasi level web server
+    (`fastcgi_read_timeout`/`Timeout`) tetap di luar cakupan repo ini — itu ada di config
+    Apache/nginx Laragon, bukan file proyek.
 
 ---
 

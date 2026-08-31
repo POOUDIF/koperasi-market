@@ -27,6 +27,16 @@ require_once APPPATH . 'libraries/Api_exception.php';
 
 date_default_timezone_set('Asia/Jakarta');
 
+/*
+| §19.7 — padanan ReadTimeout/WriteTimeout 15 detik yang dipakai server Go.
+| Hanya untuk request HTTP; worker CLI (Gold_worker) menyetel set_time_limit(0)
+| sendiri karena harus boleh menunggu BLPOP tanpa batas waktu.
+| Plus di level web server: fastcgi_read_timeout 20s (nginx) / Timeout 20 (Apache).
+*/
+if (PHP_SAPI !== 'cli') {
+    ini_set('max_execution_time', 15);
+}
+
 
 /*
 |--------------------------------------------------------------------------
