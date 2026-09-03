@@ -7,3 +7,6 @@ application/cache/*
 !application/cache/index.html
 .htaccess
 node_modules/
+
+# Hasil build frontend (frontend/dist -> public_html), lihat frontend/README.md
+public_html/

@@ -91,6 +91,27 @@ satu instance akan menyerialkan request dan uji itu jadi tidak berarti.
 
 ---
 
+## Frontend (Vue 3, satu repo dengan backend)
+
+Frontend anggota & admin ada di [`frontend/`](frontend/) — Vue 3 + Vite + TypeScript,
+tema warna diambil dari logo Jawa Dwipa Cooperative (hijau tua/coklat/emas). Lihat
+[`frontend/README.md`](frontend/README.md) untuk detail, dan
+[`DOCS/RENCANA_FRONTEND_VUE.md`](DOCS/RENCANA_FRONTEND_VUE.md) untuk rencana arsitekturnya.
+
+```bash
+cd frontend
+npm install
+npm run dev              # http://localhost:5173, proxy /api/v1 -> backend :8080
+
+npm run build             # hasil ke ../public_html, disajikan production lewat .htaccess di root
+```
+
+`.htaccess` di root repo memisahkan trafik: `/api/v1/*` tetap ke CI3 (`index.php`),
+sisanya disajikan dari `public_html/` (hasil build Vue) dengan fallback SPA ke
+`index.html` untuk client-side routing.
+
+---
+
 ## Peta endpoint
 
 | Method | Path | Auth |
