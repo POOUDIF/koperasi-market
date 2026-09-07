@@ -13,7 +13,7 @@ declare module 'vue-router' {
 }
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/koperasi-market/'),
   routes: [
     {
       path: '/',

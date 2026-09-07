@@ -6,6 +6,7 @@ import vue from '@vitejs/plugin-vue';
 // memanggil path relatif yang sama persis di dev maupun production
 // (satu domain di production lewat .htaccess — lihat DOCS/RENCANA_FRONTEND_VUE.md).
 export default defineConfig({
+  base: '/koperasi-market/',
   plugins: [vue()],
   resolve: {
     alias: {
