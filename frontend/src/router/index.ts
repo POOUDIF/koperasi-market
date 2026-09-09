@@ -75,6 +75,24 @@ const router = createRouter({
       meta: { requiresAuth: true, title: 'Emas Digital' },
     },
     {
+      path: '/dashboard/transactions',
+      name: 'transactions-history',
+      component: () => import('@/views/dashboard/TransactionsView.vue'),
+      meta: { requiresAuth: true, title: 'Riwayat Transaksi' },
+    },
+    {
+      path: '/dashboard/topup',
+      name: 'topup',
+      component: () => import('@/views/dashboard/TopUpView.vue'),
+      meta: { requiresAuth: true, title: 'Top-up Saldo' },
+    },
+    {
+      path: '/dashboard/notifications',
+      name: 'notifications',
+      component: () => import('@/views/dashboard/NotificationsView.vue'),
+      meta: { requiresAuth: true, title: 'Notifikasi' },
+    },
+    {
       path: '/dashboard/admin',
       name: 'admin-home',
       component: () => import('@/views/dashboard/admin/AdminHome.vue'),

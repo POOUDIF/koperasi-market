@@ -53,6 +53,9 @@ class Api_exception extends Exception {
     public static function installmentAlreadyPaid() { return new self('INSTALLMENT_ALREADY_PAID', 'cicilan sudah dibayar sebelumnya', 409); }
     public static function insufficientBalance()    { return new self('INSUFFICIENT_BALANCE', 'saldo rekening tidak mencukupi', 422); }
 
+    /* ---------- Notifikasi ---------- */
+    public static function notificationNotFound() { return new self('NOTIFICATION_NOT_FOUND', 'notifikasi tidak ditemukan', 404); }
+
     /* ---------- Emas ---------- */
     public static function goldPriceUnavailable()    { return new self('GOLD_PRICE_UNAVAILABLE', 'harga emas belum tersedia, hubungi admin koperasi', 503); }
     public static function goldLimitExceeded($max)   { return new self('GOLD_LIMIT_EXCEEDED', "maksimal transaksi emas adalah {$max} gram per transaksi", 400); }

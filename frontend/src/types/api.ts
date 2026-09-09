@@ -230,3 +230,47 @@ export interface PayInstallmentResponse {
 export interface ApiErrorBody {
   error: string;
 }
+
+// ---------------------------------------------------------------------------
+// Riwayat transaksi gabungan (fitur baru, di luar blueprint 24 endpoint)
+// ---------------------------------------------------------------------------
+
+export type TransactionJenis = 'semua' | 'simpanan' | 'pinjaman' | 'emas';
+
+export interface TransactionHistoryRow {
+  id: number;
+  created_at: string;
+  type: 'deposit' | 'withdraw';
+  jenis: Exclude<TransactionJenis, 'semua'>;
+  direction: 'in' | 'out';
+  description: string;
+  amount: number;
+  saldo: number;
+}
+
+export interface TransactionHistoryPage extends PageMeta {
+  transactions: TransactionHistoryRow[];
+  total: number;
+}
+
+// ---------------------------------------------------------------------------
+// Notifikasi (fitur baru, di luar blueprint 24 endpoint)
+// ---------------------------------------------------------------------------
+
+export type NotificationCategory = 'simpanan' | 'pinjaman' | 'emas' | 'sistem';
+
+export interface AppNotification {
+  id: number;
+  user_id: number;
+  category: NotificationCategory;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationsPage extends PageMeta {
+  notifications: AppNotification[];
+  total: number;
+  unread_count: number;
+}

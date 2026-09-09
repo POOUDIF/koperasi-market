@@ -42,6 +42,13 @@ $route[$api . '/gold/buy']['post']     = 'api/v1/gold/buy';
 $route[$api . '/gold/sell']['post']    = 'api/v1/gold/sell';
 $route[$api . '/gold/holding']['get']  = 'api/v1/gold/holding';
 
+/* ---------- Riwayat transaksi & notifikasi (fitur baru, di luar blueprint) ---------- */
+$route[$api . '/transactions']['get']                = 'api/v1/transactions/index';
+$route[$api . '/notifications']['get']               = 'api/v1/notifications/index';
+$route[$api . '/notifications/unread-count']['get']  = 'api/v1/notifications/unread_count';
+$route[$api . '/notifications/read-all']['put']      = 'api/v1/notifications/mark_all_read';
+$route[$api . '/notifications/(:num)/read']['put']   = 'api/v1/notifications/mark_read/$1';
+
 /* ---------- Admin (JWT + akun aktif + role pengurus|admin|super_admin) ---------- */
 $route[$api . '/admin/financing/(:num)/review']['put']                = 'api/v1/admin/review_financing/$1';
 $route[$api . '/admin/savings/deposit-requests/(:num)/review']['put'] = 'api/v1/admin/review_deposit/$1';

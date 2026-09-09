@@ -68,7 +68,34 @@ class Financing_service {
                 $financing_id, $admin_id, $this->generate_installments($f));
         }
 
-        return $this->CI->Financing_model->find($financing_id);
+        $updated = $this->CI->Financing_model->find($financing_id);
+        $this->notify_review($updated, $action);
+
+        return $updated;
+    }
+
+    /**
+     * Notifikasi hasil review ke anggota — non-fatal, sama seperti
+     * Saving_service::notify_review(): kegagalan tidak boleh membatalkan
+     * pengajuan yang sudah diproses.
+     */
+    private function notify_review(array $financing, $action) {
+        try {
+            $this->CI->load->model('Notification_model');
+
+            $amount   = 'Rp ' . number_format((float) $financing['principal_amount'], 0, ',', '.');
+            $approved = ($action === 'approve');
+
+            $this->CI->Notification_model->insert(
+                (int) $financing['user_id'],
+                'pinjaman',
+                'Pengajuan Pembiayaan ' . ($approved ? 'Disetujui' : 'Ditolak'),
+                'Pengajuan pembiayaan ' . $financing['financing_number'] . ' sebesar ' . $amount . ' telah '
+                    . ($approved ? 'disetujui. Jadwal angsuran sudah tersedia.' : 'ditolak oleh admin koperasi.')
+            );
+        } catch (Throwable $e) {
+            log_message('error', '[notification] gagal mengirim notifikasi review pembiayaan: ' . $e->getMessage());
+        }
     }
 
     /** FLOW-16 Jadwal angsuran, dengan cek kepemilikan (§14.4). */

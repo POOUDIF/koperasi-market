@@ -97,3 +97,25 @@ const ROLE_LABEL: Record<string, string> = {
 export function roleLabel(role: string): string {
   return ROLE_LABEL[role] ?? role;
 }
+
+const JENIS_LABEL: Record<string, string> = {
+  semua: 'Semua Jenis',
+  simpanan: 'Simpanan',
+  pinjaman: 'Pinjaman',
+  emas: 'Emas',
+};
+
+export function jenisLabel(jenis: string): string {
+  return JENIS_LABEL[jenis] ?? jenis;
+}
+
+const CATEGORY_ICON: Record<string, string> = {
+  simpanan: '🏦',
+  pinjaman: '📋',
+  emas: '🥇',
+  sistem: '🔔',
+};
+
+export function categoryIcon(category: string): string {
+  return CATEGORY_ICON[category] ?? '🔔';
+}

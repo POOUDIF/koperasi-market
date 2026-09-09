@@ -70,7 +70,9 @@ class Saving_service {
 
     /** FLOW-11 Verifikasi setoran oleh admin (§13.4) — satu transaction. */
     public function review_deposit($admin_id, $request_id, $action) {
-        return $this->CI->Deposit_request_model->review($admin_id, $request_id, $action);
+        $result = $this->CI->Deposit_request_model->review($admin_id, $request_id, $action);
+        $this->notify_review($this->CI->Deposit_request_model->find($request_id), $result, 'Setoran');
+        return $result;
     }
 
     /**
@@ -105,6 +107,32 @@ class Saving_service {
 
     /** Verifikasi penarikan oleh admin — satu transaction. */
     public function review_withdraw($admin_id, $request_id, $action) {
-        return $this->CI->Withdraw_request_model->review($admin_id, $request_id, $action);
+        $result = $this->CI->Withdraw_request_model->review($admin_id, $request_id, $action);
+        $this->notify_review($this->CI->Withdraw_request_model->find($request_id), $result, 'Penarikan');
+        return $result;
+    }
+
+    /**
+     * Kirim notifikasi hasil review ke anggota. Non-fatal dengan sengaja
+     * (pola sama dengan invalidate_price_cache() di Gold_service): kegagalan
+     * menulis notifikasi tidak boleh membatalkan transaksi keuangan yang
+     * sudah tercatat.
+     */
+    private function notify_review($request, $result, $noun) {
+        try {
+            $this->CI->load->model('Notification_model');
+
+            $amount = 'Rp ' . number_format((float) $request['amount'], 0, ',', '.');
+            $approved = ($result === 'approved');
+
+            $this->CI->Notification_model->insert(
+                (int) $request['user_id'],
+                'simpanan',
+                $noun . ' ' . ($approved ? 'Disetujui' : 'Ditolak'),
+                $noun . ' sebesar ' . $amount . ' telah ' . ($approved ? 'disetujui dan saldo Anda telah diperbarui.' : 'ditolak oleh admin koperasi.')
+            );
+        } catch (Throwable $e) {
+            log_message('error', '[notification] gagal mengirim notifikasi review: ' . $e->getMessage());
+        }
     }
 }

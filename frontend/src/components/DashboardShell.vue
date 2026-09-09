@@ -4,18 +4,23 @@ import { RouterLink, useRoute } from 'vue-router';
 import AppLogo from '@/components/AppLogo.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useLogout } from '@/composables/useAuth';
+import { useUnreadNotificationCount } from '@/composables/useNotifications';
 import { roleLabel } from '@/lib/utils';
 
 const route = useRoute();
 const authStore = useAuthStore();
 const logoutMutation = useLogout();
 const mobileNavOpen = ref(false);
+const unreadCountQuery = useUnreadNotificationCount();
 
 const memberLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: '🏠' },
   { to: '/dashboard/savings', label: 'Simpanan', icon: '🏦' },
   { to: '/dashboard/financing', label: 'Pembiayaan', icon: '📋' },
   { to: '/dashboard/gold', label: 'Emas Digital', icon: '🥇' },
+  { to: '/dashboard/transactions', label: 'Riwayat Transaksi', icon: '📜' },
+  { to: '/dashboard/topup', label: 'Top-up Saldo', icon: '💳' },
+  { to: '/dashboard/notifications', label: 'Notifikasi', icon: '🔔' },
   { to: '/dashboard/kyc', label: 'Profil KYC', icon: '🪪' },
 ];
 
@@ -84,11 +89,22 @@ function isActive(to: string) {
         <AppLogo :size="30" />
         <span class="font-display text-sm font-bold text-primary-800">Jawa Dwipa</span>
       </div>
-      <button class="rounded-lg p-2 text-primary-700 hover:bg-primary-50" @click="mobileNavOpen = !mobileNavOpen" aria-label="Menu">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+      <div class="flex items-center gap-1">
+        <RouterLink to="/dashboard/notifications" class="relative rounded-lg p-2 text-primary-700 hover:bg-primary-50" aria-label="Notifikasi">
+          <span class="text-lg">🔔</span>
+          <span
+            v-if="unreadCountQuery.data.value"
+            class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold text-primary-900"
+          >
+            {{ unreadCountQuery.data.value > 9 ? '9+' : unreadCountQuery.data.value }}
+          </span>
+        </RouterLink>
+        <button class="rounded-lg p-2 text-primary-700 hover:bg-primary-50" @click="mobileNavOpen = !mobileNavOpen" aria-label="Menu">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
     </header>
     <div v-if="mobileNavOpen" class="lg:hidden border-b border-primary-100 bg-white px-3 py-3 space-y-1">
       <RouterLink
@@ -107,7 +123,16 @@ function isActive(to: string) {
     <div class="lg:pl-64">
       <header class="hidden lg:flex sticky top-0 z-10 h-16 items-center justify-between border-b border-primary-100 bg-white/80 backdrop-blur px-8">
         <h1 class="font-display text-lg font-semibold text-primary-800">{{ $route.meta.title }}</h1>
-        <div v-if="authStore.user" class="flex items-center gap-3">
+        <div v-if="authStore.user" class="flex items-center gap-4">
+          <RouterLink to="/dashboard/notifications" class="relative rounded-lg p-2 text-primary-700 hover:bg-primary-50" aria-label="Notifikasi">
+            <span class="text-lg">🔔</span>
+            <span
+              v-if="unreadCountQuery.data.value"
+              class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold text-primary-900"
+            >
+              {{ unreadCountQuery.data.value > 9 ? '9+' : unreadCountQuery.data.value }}
+            </span>
+          </RouterLink>
           <div class="text-right leading-tight">
             <p class="text-sm font-medium text-primary-800">{{ authStore.user.nama_lengkap }}</p>
             <p class="text-xs text-gold-700 font-semibold">{{ roleLabel(authStore.user.role) }}</p>
