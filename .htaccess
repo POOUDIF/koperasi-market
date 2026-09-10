@@ -1,0 +1,17 @@
+RewriteEngine On
+
+# 1) Semua /api/v1/* tetap ditangani CI3 (front controller index.php), seperti sebelum ada frontend.
+#    Flag END (bukan cuma L) WAJIB: tanpa itu, .htaccess per-direktori mengulang
+#    proses rewrite dari atas setelah substitusi, dan URI baru "index.php" tidak lagi
+#    cocok RewriteCond di atas sehingga jatuh ke rule 3 (fallback SPA) alih-alih CI3.
+RewriteCond %{REQUEST_URI} ^/api/v1/
+RewriteRule ^ index.php [L,END]
+
+# 2) File statis hasil build Vue (frontend/dist disalin ke public_html/ oleh `npm run build`).
+RewriteCond %{REQUEST_URI} !^/api/v1/
+RewriteCond %{DOCUMENT_ROOT}/public_html%{REQUEST_URI} -f
+RewriteRule ^(.*)$ public_html/$1 [L,END]
+
+# 3) Sisanya (route client-side Vue Router: /login, /dashboard, /dashboard/gold, dst) -> index.html SPA.
+RewriteCond %{REQUEST_URI} !^/api/v1/
+RewriteRule ^ public_html/index.html [L,END]
