@@ -12,14 +12,21 @@ class Redisx {
     private $c;
 
     public function __construct($params = array()) {
-        $this->c = new Predis\Client(array(
-            'scheme' => 'tcp',
+        $config = array(
+            'scheme' => env('REDIS_SCHEME', 'tcp'),
             'host'   => env('REDIS_HOST', '127.0.0.1'),
             'port'   => (int) env('REDIS_PORT', 6379),
             // 0 = blokir selamanya; WAJIB untuk BLPOP di worker emas.
             'read_write_timeout' => ( ! empty($params['blocking'])) ? 0 : 3,
             'timeout' => 3,
-        ));
+        );
+
+        $password = env('REDIS_PASSWORD');
+        if ($password !== NULL) {
+            $config['password'] = $password;
+        }
+
+        $this->c = new Predis\Client($config);
     }
 
     public function client() { return $this->c; }
