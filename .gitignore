@@ -10,3 +10,6 @@ node_modules/
 
 # Hasil build frontend (frontend/dist -> public_html), lihat frontend/README.md
 public_html/
+
+# Cache incremental TypeScript, berubah setiap build lokal
+frontend/*.tsbuildinfo
