@@ -8,6 +8,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  */
 class Notifications extends Auth_Controller {
 
+    protected $allow_non_member = TRUE;
+
     public function __construct() {
         parent::__construct();
         $this->load->model('Notification_model');

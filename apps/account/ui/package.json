@@ -1,0 +1,13 @@
+{
+  "name": "jdc-account-ui",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CSS halaman server-rendered JDC Account (Tailwind, dipindai dari apps/account/views)",
+  "scripts": {
+    "build": "tailwindcss -c tailwind.config.cjs -i app.css -o ../../../public_html/account/assets/app.css --minify && node copy-assets.cjs"
+  },
+  "devDependencies": {
+    "@jdc/ui": "*",
+    "tailwindcss": "^3.4.3"
+  }
+}

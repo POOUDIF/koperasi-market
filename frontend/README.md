@@ -1,77 +1,59 @@
-# Frontend — Jawa Dwipa Cooperative
+# Frontend Koperasi Digital — Jawa Dwipa Cooperative
 
-Vue 3 (Composition API + `<script setup>`, TypeScript) + Vite. Dibangun sebagai satu
-repo dengan backend CI3 di `koperasi-market` — lihat
-[`../DOCS/RENCANA_FRONTEND_VUE.md`](../DOCS/RENCANA_FRONTEND_VUE.md) untuk rencana
-arsitektur lengkapnya (struktur repo, strategi penyajian satu domain, daftar fase).
+SPA Vue 3 (Composition API + `<script setup>`, TypeScript) + Vite, disajikan di
+**`/koperasi/`**. Bagian dari platform JDC — lihat
+[`../DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md`](../DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md).
 
 ## Stack
 
 | | |
 |---|---|
-| Framework | Vue 3 + Vite |
-| Routing | Vue Router 4, dengan guard `requiresAuth`/`requiresAdmin` yang memverifikasi lewat `GET /profile` (bukan cuma percaya state lokal) |
-| State server | `@tanstack/vue-query` — caching, invalidate, polling status transaksi emas |
-| State lokal | Pinia (`stores/auth.ts`) |
-| HTTP | Axios, satu instance (`src/lib/api.ts`) dengan interceptor 401/403/429 global |
-| Styling | Tailwind CSS, tema warna kustom di `tailwind.config.js` (`primary`=hijau, `secondary`=coklat, `gold`=emas, diambil dari logo) |
-| Toast | vue-sonner |
+| Framework | Vue 3 + Vite, `base: '/koperasi/'` |
+| Routing | Vue Router 4 — guard `requiresAuth` / `requiresMember` / `requiresAdmin`, diverifikasi lewat `GET /profile` |
+| State server | `@tanstack/vue-query` |
+| State lokal | Pinia (`stores/auth.ts`, cache profil saja) |
+| HTTP | Axios (`src/lib/api.ts`): cookie sesi `withCredentials`, header `X-Requested-With` (CSRF), interceptor 401/403/429 |
+| Styling | Tailwind + preset & komponen bersama `@jdc/ui` (`packages/ui`) |
 
 ## Menjalankan
 
+Dari **root repo** (npm workspace):
+
 ```bash
 npm install
-npm run dev
+npm run dev:koperasi      # http://localhost:5173/koperasi/ — proksi /koperasi/api & /account ke VITE_BACKEND_URL (default http://127.0.0.1:8300)
+npm run build:koperasi    # vue-tsc + vite build → ../public_html/koperasi
 ```
 
-Vite dev server jalan di `http://localhost:5173` dan mem-proxy `/api/v1/*` ke
-`http://localhost:8080` (lihat `vite.config.ts` — override dengan env
-`VITE_BACKEND_URL` bila backend jalan di port lain). Jalankan backend CI3 di
-port itu (`php -S localhost:8080 server.php` dari root repo).
-
-## Build production
-
-```bash
-npm run build
-```
-
-Output masuk ke `../public_html` (di luar folder ini, `.gitignore`-kan), yang
-disajikan lewat `.htaccess` di root repo — satu domain untuk API CI3 dan SPA ini.
-`npm run build` menjalankan type-check penuh (`vue-tsc -b`) sebelum build; pakai
-`npm run build:skiptypecheck` hanya untuk iterasi cepat lokal, jangan untuk build
-yang dideploy.
+Redirect SSO memakai `APP_URL` backend; untuk alur login penuh paling mudah build lalu buka lewat Apache.
 
 ## Struktur
 
 ```
 src/
-├── router/          route + guard auth/admin
-├── stores/           Pinia — sesi user (auth.ts)
-├── composables/      satu file per modul backend (useAuth, useSavings, useFinancing, useGold, useKyc, useAdmin)
+├── router/          route + guard (auth, keanggotaan, admin)
+├── stores/          Pinia — cache user dari GET /profile
+├── composables/     satu file per modul backend (useSavings, useFinancing, useGold, useKyc, useAdmin,
+│                    useMembership, usePayments, useAuth = profil & logout)
 ├── views/
-│   ├── auth/          login, register, verify-otp
-│   └── dashboard/     halaman anggota + dashboard/admin/ untuk panel admin
-├── components/        DashboardShell (layout+sidebar), FormModal, ConfirmModal, StatusBadge, dll — dipakai lintas halaman
-├── types/api.ts       tipe response, selaras 1:1 dengan application/config/routes.php backend
-└── lib/               axios instance + util format (Rupiah, gram, tanggal, badge status)
+│   ├── auth/         AuthErrorView (kegagalan SSO) + AuthLayout
+│   ├── dashboard/    halaman anggota, MembershipView, SecurityView (PIN), admin/
+│   └── pay/          PaymentConfirmView — konfirmasi Koperasi Pay dari Marketplace
+├── components/       DashboardShell (sidebar + AppSwitcher), FormModal, ConfirmModal, dll
+├── types/api.ts      tipe response, selaras dengan application/config/routes.php
+└── lib/              api.ts (axios), sso.ts (URL login/redirect), utils.ts (format)
 ```
 
 ## Yang wajib diketahui sebelum mengubah alur auth
 
-- `POST /register` **tidak** mengembalikan token — backend mewajibkan verifikasi
-  OTP dulu. Alurnya: register -> `/verify-otp?email=...` -> `POST /verify-email`
-  baru dapat token (lihat `useVerifyEmail` di `composables/useAuth.ts`). Jangan
-  ubah `RegisterView.vue` untuk menyimpan token langsung dari respons register —
-  itu bug yang pernah terjadi di percobaan frontend sebelumnya (lihat
-  `../DOCS/ANALISIS_FRONTEND.md`).
-- Guard admin di router (`src/router/index.ts`) memanggil `GET /profile` secara
-  langsung saat `authStore.user` masih kosong (mis. hard refresh ke URL admin),
-  supaya proteksi tetap benar walau state Pinia belum terisi. Backend tetap
-  sumber kebenaran otorisasi (401/403 di setiap request) — guard di sini murni UX.
-
-## Cakupan endpoint
-
-32/32 endpoint backend (`application/config/routes.php`) punya composable + UI,
-termasuk modul yang sebelumnya belum pernah dibuat: KYC, withdraw + riwayatnya,
-gold holding, resend-otp, dan seluruh panel admin (review setoran/penarikan,
-manajemen anggota, riwayat transaksi, atur harga emas).
+- **Tidak ada token di frontend.** Login dimulai dengan navigasi penuh ke
+  `/koperasi/api/v1/sso/login?return_to=…` (`lib/sso.ts`); backend yang bicara dengan
+  JDC Account dan memasang cookie `HttpOnly`. Jangan menyimpan apa pun terkait
+  autentikasi di `localStorage`/cookie JavaScript.
+- Semua request mengubah data WAJIB membawa `X-Requested-With: XMLHttpRequest`
+  (sudah default di instance axios) — backend menolaknya dengan 403 bila tidak.
+- `401` → redirect ke login SSO; `401 REAUTH_REQUIRED` → login ulang (`prompt=login`)
+  untuk aksi sensitif (ubah PIN); `403 MEMBERSHIP_REQUIRED` → halaman aktivasi.
+- Logout = `POST /sso/logout` lalu navigasi ke `redirect_url` (end_session JDC Account)
+  — mengeluarkan pengguna dari **semua** layanan JDC.
+- Guard router tetap hanya UX; backend sumber kebenaran otorisasi di setiap request.

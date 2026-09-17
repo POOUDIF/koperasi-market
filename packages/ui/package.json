@@ -1,0 +1,15 @@
+{
+  "name": "@jdc/ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tema & komponen bersama JDC (compro, akun, koperasi, marketplace)",
+  "exports": {
+    "./tailwind-preset": "./tailwind-preset.cjs",
+    "./components.css": "./components.css",
+    "./logo.svg": "./logo.svg",
+    "./vue/*": "./vue/*"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  }
+}

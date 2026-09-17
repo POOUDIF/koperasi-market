@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import '@jdc/ui/components.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .nav-link { @apply rounded-lg px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50; }
+  .section { @apply mx-auto max-w-6xl px-4 py-16 sm:py-20; }
+  .eyebrow { @apply text-sm font-semibold uppercase tracking-wider text-gold-700; }
+  .prose-jdc p { @apply mb-4 text-primary-700 leading-relaxed; }
+  .prose-jdc h2 { @apply mb-3 mt-10 text-2xl font-bold; }
+  .prose-jdc ul { @apply mb-4 list-disc space-y-1 pl-6 text-primary-700; }
+  .todo { @apply rounded bg-gold-100 px-1 text-gold-900; }
+}

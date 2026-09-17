@@ -2,13 +2,21 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Registrasi, verifikasi email, login (§11.1 - §11.3).
+ * Registrasi, verifikasi email, login (§11.1 - §11.3) — JALUR LAMA.
  * Basis API_Controller: tanpa JWT, tapi ber-rate-limit.
+ *
+ * Sejak SSO (AUTH_MODE=sso) identitas dikelola JDC Account di /account dan
+ * seluruh endpoint di sini membalas 410 Gone. Tetap hidup untuk AUTH_MODE
+ * legacy/both selama masa transisi & rollback (§6 Fase 4). Hapus file ini
+ * setelah mode sso stabil.
  */
 class Auth extends API_Controller {
 
     public function __construct() {
         parent::__construct();
+        if ($this->config->item('auth_mode') === 'sso') {
+            $this->fail(Api_exception::legacyAuthDisabled());
+        }
         $this->load->library(array('User_service', 'Saving_service'));
     }
 

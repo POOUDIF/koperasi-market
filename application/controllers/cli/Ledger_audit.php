@@ -27,6 +27,7 @@ class Ledger_audit extends CI_Controller {
         $dirty |= $this->_check_savings_ledger();
         $dirty |= $this->_check_financing_installments();
         $dirty |= $this->_check_gold_hanging();
+        $dirty |= $this->_check_marketplace_escrow();
 
         if ($dirty) {
             $this->_log('SELESAI DENGAN ANOMALI — lihat detail di atas', 'error');
@@ -104,6 +105,33 @@ class Ledger_audit extends CI_Controller {
             $this->_log("ANOMALI gold_transactions id={$r['id']} status={$r['status']} "
                 . "created_at={$r['created_at']} (worker mati / signer tidak terjangkau?)", 'error');
         }
+        return TRUE;
+    }
+
+    /**
+     * Koperasi Pay (§4.3): saldo rekening penampung marketplace WAJIB sama
+     * dengan total tagihan berstatus 'held'. Selisih berarti ada dana yang
+     * ditahan tanpa tagihan (atau sebaliknya) — hentikan settlement & selidiki.
+     */
+    private function _check_marketplace_escrow() {
+        $row = $this->db->query(
+            "SELECT CAST(a.balance AS CHAR) AS balance,
+                    CAST((SELECT COALESCE(SUM(amount), 0) FROM payment_intents WHERE status = 'held') AS CHAR) AS held
+               FROM savings_accounts a
+               JOIN savings_products p ON p.id = a.savings_product_id AND p.is_system = 1
+               JOIN users u ON u.id = a.user_id AND u.email = 'escrow.marketplace@system.internal'
+              LIMIT 1")->row_array();
+
+        if ( ! $row) {
+            $this->_log('LEWATI rekening penampung marketplace belum ada (migrasi 007 belum dijalankan)');
+            return FALSE;
+        }
+        if (bccomp($row['balance'], $row['held'], 4) === 0) {
+            $this->_log('OK  saldo rekening penampung = total tagihan held (' . $row['balance'] . ')');
+            return FALSE;
+        }
+
+        $this->_log("ANOMALI rekening penampung saldo={$row['balance']} total_held={$row['held']}", 'error');
         return TRUE;
     }
 

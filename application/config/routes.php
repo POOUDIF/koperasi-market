@@ -1,13 +1,17 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-/* Peta routing lengkap — §18.1 (24 endpoint + tambahan admin harga emas) */
+/* Peta routing lengkap — §18.1 (24 endpoint + tambahan admin harga emas)
+ *
+ * Sejak routing berbasis path (DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md §2.1)
+ * API koperasi berada di /koperasi/api/v1. URL lama /api/v1/* dialihkan 308
+ * oleh .htaccess root, sehingga key route di bawah memuat prefix 'koperasi'. */
 
-$route['default_controller']   = 'api/v1/health';
-$route['404_override']         = 'api/v1/notfound';
+$route['default_controller']   = 'notfound';
+$route['404_override']         = 'notfound';
 $route['translate_uri_dashes'] = FALSE;
 
-$api = 'api/v1';
+$api = 'koperasi/api/v1';
 
 /* ---------- Publik ---------- */
 $route[$api . '/health']['get']        = 'api/v1/health/index';
@@ -18,7 +22,7 @@ $route[$api . '/verify-email']['post'] = 'api/v1/auth/verify_email';
 $route[$api . '/resend-otp']['post']   = 'api/v1/auth/resend_otp';
 $route[$api . '/gold/price']['get']    = 'api/v1/gold/price';
 
-/* ---------- Terproteksi (JWT + akun aktif) ---------- */
+/* ---------- Terproteksi (sesi SSO + akun aktif [+ keanggotaan]) ---------- */
 $route[$api . '/logout']['post']     = 'api/v1/auth/logout';
 $route[$api . '/profile']['get']     = 'api/v1/profile/index';
 $route[$api . '/profile/kyc']['get'] = 'api/v1/profile/get_kyc';
@@ -62,3 +66,28 @@ $route[$api . '/admin/transactions/gold']['get']                      = 'api/v1/
 $route[$api . '/admin/transactions/saving']['get']                    = 'api/v1/admin/tx_saving';
 /* Perbaikan CACAT-08 — manajemen harga emas + invalidasi cache */
 $route[$api . '/admin/gold/price']['post']                            = 'api/v1/admin/set_gold_price';
+
+/* ---------- SSO — pola BFF (§3) ---------- */
+$route[$api . '/sso/login']['get']               = 'api/v1/sso/login';
+$route[$api . '/sso/callback']['get']            = 'api/v1/sso/callback';
+$route[$api . '/sso/logout']['post']             = 'api/v1/sso/logout';
+$route[$api . '/sso/backchannel-logout']['post'] = 'api/v1/sso/backchannel_logout';
+
+/* ---------- Keanggotaan & PIN transaksi ---------- */
+$route[$api . '/membership']['get']           = 'api/v1/membership/index';
+$route[$api . '/membership/activate']['post'] = 'api/v1/membership/activate';
+$route[$api . '/security/pin']['get']         = 'api/v1/security/pin_status';
+$route[$api . '/security/pin']['put']         = 'api/v1/security/set_pin';
+
+/* ---------- Koperasi Pay — sisi anggota (§4.3) ---------- */
+$route[$api . '/payments/(pi_[a-f0-9]{24})']['get']          = 'api/v1/payments/show/$1';
+$route[$api . '/payments/(pi_[a-f0-9]{24})/confirm']['post'] = 'api/v1/payments/confirm/$1';
+$route[$api . '/payments/(pi_[a-f0-9]{24})/cancel']['post']  = 'api/v1/payments/cancel/$1';
+
+/* ---------- API internal antar layanan (token client_credentials, §4.1) ---------- */
+$route[$api . '/internal/members/([A-Za-z0-9_-]+)']['get']                  = 'api/v1/internal/members/show/$1';
+$route[$api . '/internal/payment-intents']['post']                          = 'api/v1/internal/payment_intents/create';
+$route[$api . '/internal/payment-intents/(pi_[a-f0-9]{24})']['get']         = 'api/v1/internal/payment_intents/show/$1';
+$route[$api . '/internal/payment-intents/(pi_[a-f0-9]{24})/settle']['post'] = 'api/v1/internal/payment_intents/settle/$1';
+$route[$api . '/internal/payment-intents/(pi_[a-f0-9]{24})/refund']['post'] = 'api/v1/internal/payment_intents/refund/$1';
+$route[$api . '/internal/payment-intents/(pi_[a-f0-9]{24})/cancel']['post'] = 'api/v1/internal/payment_intents/cancel/$1';

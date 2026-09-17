@@ -7,25 +7,61 @@ export type UserStatus = 'active' | 'inactive' | 'banned';
 
 export interface User {
   id: number;
+  /** ID akun JDC (subject token OIDC) — kunci penautan ke JDC Account. */
+  sso_sub: string | null;
   nama_lengkap: string;
   email: string;
   role: UserRole;
   wallet_address: string | null;
   status: UserStatus;
+  /** NULL = punya akun JDC tapi belum aktivasi keanggotaan koperasi. */
+  member_since: string | null;
+  is_member: boolean;
+  is_email_verified: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export const ADMIN_ROLES: UserRole[] = ['pengurus', 'admin', 'super_admin'];
 
-export interface AuthResponse {
-  token: string;
-  user: User;
+// ---------------------------------------------------------------------------
+// Keanggotaan & PIN transaksi
+// ---------------------------------------------------------------------------
+
+export interface MembershipStatus {
+  is_member: boolean;
+  member_since: string | null;
+  kyc_completed: boolean;
 }
 
-export interface RegisterResponse {
-  message: string;
-  user_id: number;
+export interface PinStatus {
+  has_pin: boolean;
+  locked_until: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Koperasi Pay
+// ---------------------------------------------------------------------------
+
+export type PaymentIntentStatus = 'requires_confirmation' | 'held' | 'settled' | 'refunded' | 'cancelled' | 'expired';
+
+export interface PaymentIntentView {
+  id: string;
+  merchant_ref: string;
+  merchant_name: string;
+  amount: number;
+  description: string;
+  status: PaymentIntentStatus;
+  expires_at: string;
+  return_url: string;
+  has_pin: boolean;
+  accounts: { id: number; product_name: string; balance: number }[];
+  created_at: string;
+}
+
+export interface PaymentActionResult {
+  status: PaymentIntentStatus;
+  redirect_url: string;
 }
 
 // ---------------------------------------------------------------------------

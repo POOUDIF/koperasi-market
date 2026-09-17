@@ -11,9 +11,9 @@
     "type-check": "vue-tsc -b --noEmit"
   },
   "dependencies": {
+    "@jdc/ui": "*",
     "@tanstack/vue-query": "^5.28.14",
     "axios": "^1.6.8",
-    "js-cookie": "^3.0.5",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
@@ -21,7 +21,6 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/js-cookie": "^3.0.6",
     "@types/node": "^20.12.7",
     "@vitejs/plugin-vue": "^5.0.4",
     "autoprefixer": "^10.4.19",

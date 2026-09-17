@@ -1,7 +1,26 @@
+# Platform Jawa Dwipa Cooperative (JDC)
+
+Satu repo, satu domain (`https://jdc.shfopis.com`), routing berbasis path:
+
+| Path | Layanan | Kode |
+|---|---|---|
+| `/` | Company profile + pilihan layanan | [`compro/`](compro/) |
+| `/account` | **JDC Account** — SSO (OpenID Connect) untuk semua layanan | [`apps/account/`](apps/account/) |
+| `/koperasi` | **Koperasi Digital** — dokumen ini | [`application/`](application/), [`frontend/`](frontend/) |
+| `/market` | **Marketplace** — bayar dengan saldo koperasi (Koperasi Pay) | [`apps/market/`](apps/market/), [`market-frontend/`](market-frontend/) |
+
+Arsitektur SSO, integrasi, deploy, dan operasional: **[`DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md`](DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md)**.
+
+---
+
 # Koperasi Syariah Digital — REST API (CodeIgniter 3 + PHP 7.4)
 
 Implementasi dari [`SYSTEM_FLOW_CI3_BLUEPRINT.md`](SYSTEM_FLOW_CI3_BLUEPRINT.md),
 port dari backend Go ke CodeIgniter 3.1.13.
+
+> **Sejak SSO:** login/registrasi/OTP pindah ke JDC Account; API koperasi kini di
+> `/koperasi/api/v1` dengan cookie sesi (pola BFF), bukan token Bearer. Akun JDC baru
+> harus **aktivasi keanggotaan** (setelah KYC) sebelum memakai simpanan/pembiayaan/emas.
 
 **Status: Fase 0–5 selesai + seluruh endpoint admin & paginasi.**
 27 endpoint aktif, 63 uji fungsional dan 11 uji konkurensi lulus.
@@ -45,82 +64,82 @@ dan 409 untuk NIK duplikat (di Go jatuh ke 500).
 
 ## Menjalankan
 
-### Prasyarat
-PHP 7.4 (`bcmath`, `mysqli`, `mbstring`, `openssl`, `curl`, `json`),
-MySQL 8, Redis 5+, Composer 2.
-
-### Langkah
+Langkah lengkap (tiga database, `.env` tiap layanan, kunci OIDC, migrasi user, build frontend, cron):
+[`DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md` §6–§7](DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md#6-menjalankan-lokal).
+Ringkasnya:
 
 ```bash
-composer install
-cp .env.example .env          # lalu isi JWT_SECRET (min. 32 karakter) & kredensial DB
-
-# skema + seed
-mysql -u root -e "CREATE DATABASE koperasi_digital CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root koperasi_digital < database/migrations/001_schema.sql
-mysql -u root koperasi_digital < database/migrations/002_seed.sql
-
-# pengembangan
-php -S 127.0.0.1:8099 server.php
-
-# produksi: arahkan document root ke folder ini; .htaccess sudah menangani
-# rewrite + penerusan header Authorization (§19.10)
+composer install && npm install
+# .env, apps/account/.env, apps/market/.env  (salin dari .env.example masing-masing)
+# skema: database/migrations/001..007 (koperasi), database/account, database/market
+php account.php cli/keys generate
+php account.php cli/clients sync
+npm run build                       # → public_html/{compro,account,koperasi,market}
 ```
 
-Cek: `curl http://127.0.0.1:8099/api/v1/health` → `{"status":"ok", …}`.
+Sajikan folder repo lewat Apache (`mod_rewrite`, `mod_headers`) — `.htaccess` root memetakan path ke tiap
+layanan. `php -S 127.0.0.1:8300 server.php` cukup untuk dev cepat, tetapi back-channel logout & webhook
+butuh server multi-thread.
 
-Tanpa `SMTP_HOST`, OTP tidak dikirim tapi ditulis ke `application/logs/log-*.php`
-sebagai `[EMAIL SIMULATION] OTP 123456 untuk …` — itu mode pengembangan.
+Cek: `curl http://<origin>/koperasi/api/v1/health` → `{"status":"ok", …}` (juga `/account/health`, `/market/api/v1/health`).
 
-### Menaikkan role admin
+Tanpa `SMTP_HOST` di `apps/account/.env`, OTP & tautan reset sandi ditulis ke `apps/account/logs/`
+sebagai `[EMAIL SIMULATION] …` — mode pengembangan.
+
+### Menaikkan role
 
 ```sql
-UPDATE users SET role = 'super_admin' WHERE email = 'admin@mail.com';
+-- pengurus/admin koperasi (per layanan)
+UPDATE users SET role = 'super_admin' WHERE email = 'admin@mail.com';   -- DB koperasi_digital
+```
+```bash
+php account.php cli/users promote admin@mail.com    # admin platform JDC (blokir akun global)
+php market.php  cli/admin promote admin@mail.com    # admin marketplace
 ```
 
 ### Uji
 
 ```bash
-bash tests/smoke_test.sh                      # 63 assertion, alur §22
-php -S 127.0.0.1:8098 server.php &            # instance kedua, wajib untuk uji berikut
-bash tests/concurrency_test.sh 8099 8098      # 11 assertion, row locking
+bash tests/sso_e2e_test.sh          # 118 assertion: OIDC, SSO lintas layanan, Koperasi Pay, marketplace
+bash tests/smoke_test.sh            # 72 assertion, alur §22 lewat sesi SSO
+bash tests/concurrency_test.sh      # 11 assertion, row locking (butuh Apache multi-thread)
+npm run type-check
 ```
 
-Uji konkurensi butuh **dua** instance karena `php -S` single-threaded —
-satu instance akan menyerialkan request dan uji itu jadi tidak berarti.
+Uji membutuhkan Apache + MySQL + Redis lokal dan `RATE_LIMIT_SCALE=50` di ketiga `.env`
+(banyak akun dibuat dari satu IP; diabaikan di produksi).
 
 ---
 
-## Frontend (Vue 3, satu repo dengan backend)
+## Frontend
 
-Frontend anggota & admin ada di [`frontend/`](frontend/) — Vue 3 + Vite + TypeScript,
-tema warna diambil dari logo Jawa Dwipa Cooperative (hijau tua/coklat/emas). Lihat
-[`frontend/README.md`](frontend/README.md) untuk detail, dan
-[`DOCS/RENCANA_FRONTEND_VUE.md`](DOCS/RENCANA_FRONTEND_VUE.md) untuk rencana arsitekturnya.
+| Folder | Isi | Build → |
+|---|---|---|
+| [`frontend/`](frontend/) | SPA Koperasi Digital (Vue 3 + Vite + TS) | `public_html/koperasi/` |
+| [`market-frontend/`](market-frontend/) | SPA Marketplace (Vue 3 + Vite + TS) | `public_html/market/` |
+| [`compro/`](compro/) | Company profile statis (Vite multi-page) | `public_html/compro/` |
+| [`apps/account/ui/`](apps/account/ui/) | CSS Tailwind halaman JDC Account | `public_html/account/assets/` |
+| [`packages/ui/`](packages/ui/) | `@jdc/ui`: preset warna logo JDC, komponen CSS, `AppLogo`, `AppSwitcher` | — |
 
-```bash
-cd frontend
-npm install
-npm run dev              # http://localhost:5173, proxy /api/v1 -> backend :8080
-
-npm run build             # hasil ke ../public_html, disajikan production lewat .htaccess di root
-```
-
-`.htaccess` di root repo memisahkan trafik: `/api/v1/*` tetap ke CI3 (`index.php`),
-sisanya disajikan dari `public_html/` (hasil build Vue) dengan fallback SPA ke
-`index.html` untuk client-side routing.
+Semuanya satu npm workspace: `npm run build` di root membangun keempatnya; `npm run dev:koperasi`,
+`dev:market`, `dev:compro` untuk hot reload.
 
 ---
 
 ## Peta endpoint
 
+Semua path di bawah ini relatif terhadap **`/koperasi/api/v1`** (URL lama `/api/v1/*` dialihkan 308).
+Endpoint SSO, keanggotaan, PIN, Koperasi Pay, dan API internal: lihat
+[`DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md` §5](DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md#5-peta-endpoint).
+"JWT" di tabel berarti sesi login (cookie SSO; Bearer hanya saat `AUTH_MODE` legacy/both).
+
 | Method | Path | Auth |
 |---|---|---|
 | GET | `/api/v1/health` | — |
-| POST | `/api/v1/register` | rate-limit |
-| POST | `/api/v1/login` | rate-limit |
-| POST | `/api/v1/verify-email` | rate-limit |
-| POST | `/api/v1/resend-otp` | rate-limit |
+| POST | `/api/v1/register` | 410 saat `AUTH_MODE=sso` |
+| POST | `/api/v1/login` | 410 saat `AUTH_MODE=sso` |
+| POST | `/api/v1/verify-email` | 410 saat `AUTH_MODE=sso` |
+| POST | `/api/v1/resend-otp` | 410 saat `AUTH_MODE=sso` |
 | GET | `/api/v1/gold/price` | — |
 | POST | `/api/v1/logout` | JWT |
 | GET | `/api/v1/profile` | JWT |
@@ -168,7 +187,10 @@ npm install && npm start
 
 # Verifikasi integritas buku besar (§22) — jadwalkan harian via cron/Task
 # Scheduler; exit code 1 bila ada anomali:
-php index.php cli/ledger_audit run
+php index.php cli/ledger_audit run      # termasuk cek rekening penampung marketplace
+
+# Koperasi Pay: retry webhook + kedaluwarsakan tagihan (cron tiap menit)
+php index.php cli/webhooks run
 ```
 
 ---
@@ -181,8 +203,10 @@ routes.php → controllers/api/v1/*   HTTP: bind, validasi, serialisasi. Tanpa l
            → models/*_model         SQL mentah, transaction, FOR UPDATE, terjemahan error driver.
 ```
 
-Rantai middleware Gin ditiru oleh tiga kelas di `application/core/MY_Controller.php`:
-`API_Controller` → `Auth_Controller` → `Admin_Controller`.
+Rantai middleware Gin ditiru oleh kelas di `application/core/MY_Controller.php`:
+`API_Controller` → `Auth_Controller` → `Admin_Controller`, plus `Internal_Controller` untuk API antar layanan.
+Kode generik (Redis, validator, Money, model dasar, klien OIDC, sesi BFF) ada di [`shared/`](shared/) dan dipakai
+bersama JDC Account & Marketplace.
 Controller yang mencampur endpoint publik dan terproteksi (`Gold`) memanggil
 `require_member()` per method.
 
@@ -197,7 +221,8 @@ Empat aturan yang dipegang di seluruh kode dan **tidak boleh dilanggar**:
 
 `reference_id` di `savings_transactions` adalah kunci korelasi antar modul dan
 formatnya tidak boleh diubah: `cicilan_{id}`, `gold_buy_{id}`, `gold_sell_{id}`,
-`gold_refund_{id}`. Refund emas menemukan rekening asal lewat `gold_buy_{id}`.
+`gold_refund_{id}`, serta Koperasi Pay `market_pay_{intent}`, `market_settle_{intent}`,
+`market_refund_{intent}`. Refund emas menemukan rekening asal lewat `gold_buy_{id}`.
 
 ---
 

@@ -6,23 +6,11 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 | BOOTSTRAP KOPERASI DIGITAL  (§6.3, §10.1, §10.2)
 | -------------------------------------------------------------------------
 | Dimuat paling awal oleh get_config(), sebelum hooks & controller, sehingga
-| env(), Money, dan Api_exception tersedia di SELURUH lapisan aplikasi.
+| Money dan Api_exception tersedia di SELURUH lapisan aplikasi. Autoload
+| composer, env() dan .env sudah dimuat shared/bootstrap.php (index.php).
 */
-require_once FCPATH . 'vendor/autoload.php';
-
-if ( ! function_exists('env')) {
-    /** Ambil variabel lingkungan; string kosong diperlakukan sebagai tidak diset. */
-    function env($key, $default = NULL) {
-        $v = $_ENV[$key] ?? getenv($key);
-        return ($v === FALSE || $v === '') ? $default : $v;
-    }
-}
-
-if (file_exists(FCPATH . '.env')) {
-    Dotenv\Dotenv::createImmutable(FCPATH)->safeLoad();
-}
-
-require_once APPPATH . 'libraries/Money.php';
+require_once SHAREDPATH . 'libraries/Money.php';
+require_once SHAREDPATH . 'core/Request_guard.php';
 require_once APPPATH . 'libraries/Api_exception.php';
 
 date_default_timezone_set('Asia/Jakarta');
@@ -257,7 +245,7 @@ $config['allow_get_array'] = TRUE;
 | your log files will fill up very fast.
 |
 */
-$config['log_threshold'] = (env('APP_ENV') === 'production') ? 1 : 3;
+$config['log_threshold'] = (ENVIRONMENT === 'production') ? 1 : 3;
 /*
 |--------------------------------------------------------------------------
 | Error Logging Directory Path

@@ -1,0 +1,26 @@
+{
+  "name": "jdc-platform",
+  "private": true,
+  "description": "Frontend JDC: company profile, JDC Account (CSS), Koperasi Digital, Marketplace — satu workspace npm",
+  "workspaces": [
+    "packages/ui",
+    "apps/account/ui",
+    "compro",
+    "frontend",
+    "market-frontend"
+  ],
+  "scripts": {
+    "build": "npm run build -w jdc-account-ui && npm run build -w jdc-compro && npm run build -w koperasi-frontend && npm run build -w market-frontend",
+    "build:account": "npm run build -w jdc-account-ui",
+    "build:compro": "npm run build -w jdc-compro",
+    "build:koperasi": "npm run build -w koperasi-frontend",
+    "build:market": "npm run build -w market-frontend",
+    "dev:compro": "npm run dev -w jdc-compro",
+    "dev:koperasi": "npm run dev -w koperasi-frontend",
+    "dev:market": "npm run dev -w market-frontend",
+    "type-check": "npm run type-check -w koperasi-frontend && npm run type-check -w market-frontend"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

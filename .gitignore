@@ -1,14 +1,27 @@
-vendor/
+# --- Rahasia & konfigurasi lokal (semua layanan) ---
 .env
-.claude/
+!.env.example
+apps/account/keys/
+
+# --- Dependensi ---
+vendor/
+node_modules/
+
+# --- Runtime CI3 (koperasi, account, market) ---
 application/logs/*
 !application/logs/index.html
 application/cache/*
 !application/cache/index.html
-node_modules/
+apps/*/logs/*
+!apps/*/logs/index.html
+apps/*/cache/*
+!apps/*/cache/index.html
 
-# Hasil build frontend (frontend/dist -> public_html), lihat frontend/README.md
+# --- Hasil build frontend (compro, account CSS, koperasi, market) → public_html ---
 public_html/
 
-# Cache incremental TypeScript, berubah setiap build lokal
-frontend/*.tsbuildinfo
+# Cache incremental TypeScript
+*.tsbuildinfo
+
+.claude/
+.DS_Store

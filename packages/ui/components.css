@@ -1,0 +1,57 @@
+/*
+ * Komponen dasar bersama JDC. Impor SEBELUM direktif @tailwind di CSS aplikasi:
+ *   @import '@jdc/ui/components.css';
+ * dan pakai preset '@jdc/ui/tailwind-preset' di tailwind.config.
+ */
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+  body {
+    @apply bg-cream-100 text-primary-900 font-sans antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display text-primary-800;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold
+           transition disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  .btn-primary {
+    @apply btn bg-primary-700 text-cream-50 shadow-sm hover:bg-primary-800 focus:ring-primary-600;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-primary-700 border border-primary-200 shadow-sm hover:bg-primary-50 focus:ring-primary-400;
+  }
+  .btn-gold {
+    @apply btn bg-gold-500 text-primary-900 shadow-sm hover:bg-gold-600 focus:ring-gold-400;
+  }
+  .btn-danger {
+    @apply btn bg-secondary-700 text-cream-50 shadow-sm hover:bg-secondary-800 focus:ring-secondary-500;
+  }
+  .card {
+    @apply rounded-xl2 border border-primary-100 bg-white p-6 shadow-card transition hover:shadow-card-hover;
+  }
+  .input {
+    @apply block w-full rounded-lg border border-primary-200 bg-white px-3.5 py-2.5 text-sm text-primary-900
+           placeholder-primary-300 shadow-sm transition
+           focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20
+           disabled:cursor-not-allowed disabled:bg-cream-100 disabled:text-primary-400;
+  }
+  .label {
+    @apply block text-sm font-medium text-primary-800 mb-1.5;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+  .auth-bg {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(230, 185, 77, 0.07) 0, transparent 45%),
+      radial-gradient(circle at 85% 75%, rgba(230, 185, 77, 0.07) 0, transparent 40%),
+      linear-gradient(135deg, #143327 0%, #1B4332 50%, #3D2215 100%);
+  }
+}

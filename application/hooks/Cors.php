@@ -8,7 +8,17 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Cors {
 
     public function handle() {
-        $allowed = env('FRONTEND_URL', 'http://localhost:3000');
+        // Sejak SSO, SPA & API satu origin (jdc.shfopis.com/koperasi) dan auth
+        // memakai cookie — CORS ber-credentials ke origin lain HANYA untuk dev
+        // server Vite terpisah. Di produksi tidak ada origin lain yang diizinkan.
+        if (ENVIRONMENT !== 'development') {
+            if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+                header('HTTP/1.1 204 No Content');
+                exit;
+            }
+            return;
+        }
+        $allowed = env('FRONTEND_URL', 'http://localhost:5173');
         $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         if ($origin !== '' && $origin === $allowed) {
@@ -18,7 +28,7 @@ class Cors {
         }
 
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Authorization, Content-Type');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
         header('Access-Control-Expose-Headers: Content-Length');
         header('Access-Control-Max-Age: 43200');
 

@@ -6,6 +6,9 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  */
 class Profile extends Auth_Controller {
 
+    // Profil & KYC dibutuhkan SEBELUM aktivasi keanggotaan.
+    protected $allow_non_member = TRUE;
+
     public function __construct() {
         parent::__construct();
         $this->load->model('User_profile_model');

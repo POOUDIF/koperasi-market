@@ -61,6 +61,28 @@ class Api_exception extends Exception {
     public static function goldLimitExceeded($max)   { return new self('GOLD_LIMIT_EXCEEDED', "maksimal transaksi emas adalah {$max} gram per transaksi", 400); }
     public static function goldInsufficientHolding() { return new self('GOLD_INSUFFICIENT_HOLDING', 'saldo emas Anda tidak mencukupi untuk penjualan ini', 422); }
 
+    /* ---------- SSO, keanggotaan & keamanan transaksi ---------- */
+    public static function reauthRequired()      { return new self('REAUTH_REQUIRED', 'demi keamanan, masukkan kembali kata sandi Anda untuk melanjutkan', 401); }
+    public static function sessionUnavailable()  { return new self('SESSION_UNAVAILABLE', 'layanan sesi sedang tidak tersedia, coba beberapa saat lagi', 503); }
+    public static function membershipRequired()  { return new self('MEMBERSHIP_REQUIRED', 'aktifkan keanggotaan koperasi terlebih dahulu', 403); }
+    public static function alreadyMember()       { return new self('ALREADY_MEMBER', 'keanggotaan koperasi Anda sudah aktif', 409); }
+    public static function kycRequired()         { return new self('KYC_REQUIRED', 'lengkapi profil KYC sebelum mengaktifkan keanggotaan', 422); }
+    public static function accountLinkConflict() { return new self('ACCOUNT_LINK_CONFLICT', 'email ini sudah terdaftar pada data koperasi lama dan belum ditautkan, hubungi admin koperasi', 409); }
+    public static function legacyAuthDisabled()  { return new self('LEGACY_AUTH_DISABLED', 'login kini melalui Akun JDC di /account', 410); }
+    public static function pinNotSet()           { return new self('PIN_NOT_SET', 'buat PIN transaksi terlebih dahulu', 422); }
+    public static function pinInvalid()          { return new self('PIN_INVALID', 'PIN transaksi salah', 422); }
+    public static function pinLocked()           { return new self('PIN_LOCKED', 'PIN transaksi terkunci karena terlalu banyak percobaan, coba lagi nanti', 423); }
+    public static function weakPin()             { return new self('WEAK_PIN', 'PIN harus 6 digit angka dan tidak boleh berulang/berurutan (mis. 111111, 123456)', 400); }
+
+    /* ---------- Koperasi Pay (§4) ---------- */
+    public static function paymentNotFound()         { return new self('PAYMENT_NOT_FOUND', 'tagihan pembayaran tidak ditemukan', 404); }
+    public static function paymentNotConfirmable()   { return new self('PAYMENT_NOT_CONFIRMABLE', 'tagihan ini sudah diproses, dibatalkan, atau kedaluwarsa', 409); }
+    public static function paymentInvalidTransition($from, $to) { return new self('PAYMENT_INVALID_TRANSITION', "tagihan berstatus {$from} tidak bisa diubah menjadi {$to}", 409); }
+    public static function idempotencyConflict()     { return new self('IDEMPOTENCY_CONFLICT', 'Idempotency-Key sudah dipakai untuk permintaan dengan isi berbeda', 409); }
+    public static function payerNotMember()          { return new self('PAYER_NOT_MEMBER', 'pembeli belum menjadi anggota koperasi aktif', 422); }
+    public static function payeeNotMember()          { return new self('PAYEE_NOT_MEMBER', 'penjual belum menjadi anggota koperasi aktif', 422); }
+    public static function paymentAccountIneligible() { return new self('PAYMENT_ACCOUNT_INELIGIBLE', 'rekening ini tidak dapat dipakai untuk pembayaran', 422); }
+
     /* ---------- Generik ---------- */
     public static function unauthorized($msg = 'sesi tidak valid, silakan login kembali') { return new self('UNAUTHORIZED', $msg, 401); }
     public static function forbidden($msg = 'akses ditolak: hak akses tidak mencukupi')   { return new self('FORBIDDEN', $msg, 403); }

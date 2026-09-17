@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /account/
+Disallow: /koperasi/
+Disallow: /market/api/
+Disallow: /market/cart
+Disallow: /market/checkout
+Disallow: /market/orders
+
+Sitemap: https://jdc.shfopis.com/sitemap.xml

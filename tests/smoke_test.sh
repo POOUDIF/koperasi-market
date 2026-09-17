@@ -3,45 +3,47 @@
 # Verifikasi manual §22 — dijalankan berurutan, tiap langkah bergantung
 # pada hasil sebelumnya.
 #
-#   bash tests/smoke_test.sh [BASE_URL]
+#   bash tests/smoke_test.sh [ORIGIN]        default http://127.0.0.1:8300
 #
-# Prasyarat: MySQL + Redis jalan, skema & seed sudah diterapkan,
-# SMTP_HOST kosong (OTP muncul di application/logs).
+# Sejak SSO (DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md) login lewat JDC Account
+# dan API koperasi memakai cookie sesi — skrip ini melewati alur login yang
+# sama persis dengan browser (tests/lib/jdc.sh), tanpa backdoor.
+#
+# Prasyarat: Apache menyajikan repo ini di ORIGIN, MySQL + Redis jalan, skema
+# & seed sudah diterapkan, SMTP_HOST kosong di apps/account/.env.
 # =====================================================================
 set -u
 
-BASE="${1:-http://127.0.0.1:8099/api/v1}"
-MYSQL="C:/laragon/bin/mysql/mysql-8.0.30-winx64/bin/mysql.exe"
-LOGDIR="$(cd "$(dirname "$0")/.." && pwd)/application/logs"
+ORIGIN="${1:-${ORIGIN:-http://127.0.0.1:8300}}"
+source "$(dirname "$0")/lib/jdc.sh"
+export MYSQL_PWD="${MYSQL_PWD:-$(sed -n 's/^DB_PASSWORD=//p' "$ROOT/.env" | tail -1)}"
+
+BASE="$ORIGIN/koperasi/api/v1"
+MYSQL="$MYSQL_BIN"
 
 PASS=0; FAIL=0
 STAMP=$(date +%s)
 MEMBER="budi${STAMP}@mail.com"
 ADMIN="admin${STAMP}@mail.com"
-PW="rahasia123"
+PW="Rahasia#${STAMP}"
+TOKEN="$TMPD/member.jar"; ADMIN_TOKEN="$TMPD/admin.jar"; : > "$TOKEN"; : > "$ADMIN_TOKEN"
 
 # --- util -------------------------------------------------------------
-# jval <json> <key>  — ekstrak nilai skalar tanpa jq
-jval() { printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^,\"}]*\)\"\{0,1\}.*/\1/p" | head -1; }
-
 check() { # check <label> <actual> <expected>
-  if [ "$2" = "$3" ]; then printf '  \033[32mOK\033[0m   %-58s %s\n' "$1" "$2"; PASS=$((PASS+1))
-  else printf '  \033[31mFAIL\033[0m %-58s got=%s want=%s\n' "$1" "$2" "$3"; FAIL=$((FAIL+1)); fi
+  if [ "$2" = "$3" ]; then printf '  [32mOK[0m   %-58s %s
+' "$1" "$2"; PASS=$((PASS+1))
+  else printf '  [31mFAIL[0m %-58s got=%s want=%s
+' "$1" "$2" "$3"; FAIL=$((FAIL+1)); fi
 }
 
-code() { # code <method> <path> [json] [token]
+code() { # code <method> <path> [json] [cookie-jar]
   local m="$1" p="$2" d="${3:-}" t="${4:-}"
-  local args=(-s -o /tmp/body.$$ -w '%{http_code}' -X "$m" "$BASE$p" -H 'Content-Type: application/json')
-  [ -n "$t" ] && args+=(-H "Authorization: Bearer $t")
+  local args=(-s -o /tmp/body.$$ -w '%{http_code}' -X "$m" "$BASE$p" -H 'Content-Type: application/json' -H 'X-Requested-With: XMLHttpRequest')
+  [ -n "$t" ] && args+=(-b "$t" -c "$t")
   [ -n "$d" ] && args+=(-d "$d")
   curl "${args[@]}"
 }
 body() { cat /tmp/body.$$; }
-
-otp_for() { # ambil OTP terakhir untuk sebuah email dari log simulasi email
-  grep -h "EMAIL SIMULATION" "$LOGDIR"/log-*.php 2>/dev/null \
-    | grep "$1" | tail -1 | sed -n 's/.*OTP \([0-9]\{6\}\).*/\1/p'
-}
 
 echo "== BASE: $BASE"
 
@@ -52,53 +54,30 @@ check "  services.database" "$(jval "$(body)" database)" "ok"
 check "  services.redis"    "$(jval "$(body)" redis)"    "ok"
 c=$(code GET /tidak-ada); check "route tak dikenal -> 404 JSON" "$c" "404"
 
-# --- 2..7 Auth --------------------------------------------------------
-echo "-- Fase 1: autentikasi"
-c=$(code POST /register "{\"nama_lengkap\":\"Budi Santoso\",\"email\":\"$MEMBER\",\"password\":\"$PW\"}")
-check "register anggota" "$c" "201"
-UID_MEMBER=$(jval "$(body)" user_id)
-
-c=$(code POST /register "{\"nama_lengkap\":\"Budi Santoso\",\"email\":\"$MEMBER\",\"password\":\"$PW\"}")
-check "register email duplikat -> 409" "$c" "409"
-
-c=$(code POST /register "{\"nama_lengkap\":\"Bu\",\"email\":\"x@y.co\",\"password\":\"$PW\"}")
-check "nama < 3 karakter -> 400" "$c" "400"
-
-c=$(code POST /register "{\"nama_lengkap\":\"Cukup Panjang\",\"email\":\"x@y.co\",\"password\":\"pendek\"}")
-check "password < 8 karakter -> 400" "$c" "400"
-
+# --- 2..7 Auth (SSO) ---------------------------------------------------
+echo "-- Fase 1: autentikasi lewat JDC Account"
 c=$(code POST /login "{\"email\":\"$MEMBER\",\"password\":\"$PW\"}")
-check "login sebelum verifikasi -> 403" "$c" "403"
+check "endpoint login lama -> 410 Gone" "$c" "410"
 
-# resend-otp (usulan perbaikan CACAT-06, belum ada di blueprint asli)
-FIRST_OTP=$(otp_for "$MEMBER")
-c=$(code POST /resend-otp "{\"email\":\"$MEMBER\"}")
-check "resend-otp email terdaftar -> 200" "$c" "200"
-c=$(code POST /resend-otp '{"email":"tidak-terdaftar-xyz@mail.com"}')
-check "resend-otp email tidak terdaftar -> tetap 200 (anti-enumerasi)" "$c" "200"
-c=$(code POST /verify-email "{\"email\":\"$MEMBER\",\"otp\":\"$FIRST_OTP\"}")
-check "  OTP lama tertimpa oleh resend -> 400" "$c" "400"
+idp_register "$TOKEN" "Budi Santoso" "$MEMBER" "$PW" >/dev/null
+check "registrasi + OTP di JDC Account" "$(sql jdc_account "SELECT email_verified_at IS NOT NULL FROM users WHERE email='$MEMBER'")" "1"
+check "login SSO ke koperasi" "$(app_login "$TOKEN" koperasi)" "$ORIGIN/koperasi/dashboard"
 
-OTP=$(otp_for "$MEMBER")
-check "OTP tersimulasi di log (6 digit)" "$(printf '%s' "$OTP" | wc -c | tr -d ' ')" "6"
-
-c=$(code POST /verify-email "{\"email\":\"$MEMBER\",\"otp\":\"000000\"}")
-check "OTP salah -> 400" "$c" "400"
-
-c=$(code POST /verify-email "{\"email\":\"$MEMBER\",\"otp\":\"$OTP\"}")
-check "verify-email -> 200" "$c" "200"
-TOKEN=$(jval "$(body)" token)
-check "  token terbit" "$([ -n "$TOKEN" ] && echo yes || echo no)" "yes"
+c=$(code GET /profile "" "$TOKEN"); check "GET /profile (cookie sesi)" "$c" "200"
 check "  password_hash TIDAK bocor" "$(printf '%s' "$(body)" | grep -c password_hash)" "0"
+check "  akun baru belum anggota" "$(jval "$(body)" is_member)" "false"
 
-c=$(code POST /verify-email "{\"email\":\"$MEMBER\",\"otp\":\"$OTP\"}")
-check "OTP sekali pakai -> 400" "$c" "400"
+printf '127.0.0.1	FALSE	/koperasi	FALSE	0	kop_sid	cookie-palsu-%064d
+' 0 > "$TMPD/fake.jar"
+c=$(code GET /profile "" "$TMPD/fake.jar"); check "cookie sesi palsu -> 401" "$c" "401"
+c=$(code GET /profile); check "tanpa cookie sesi -> 401" "$c" "401"
 
-c=$(code GET /profile "" "$TOKEN"); check "GET /profile" "$c" "200"
-check "  password_hash TIDAK bocor" "$(printf '%s' "$(body)" | grep -c password_hash)" "0"
-
-c=$(code GET /profile "" "token-palsu"); check "token palsu -> 401" "$c" "401"
-c=$(code GET /profile); check "tanpa header Authorization -> 401" "$c" "401"
+c=$(code GET /savings/accounts "" "$TOKEN"); check "belum anggota -> 403 MEMBERSHIP_REQUIRED" "$c" "403"
+c=$(code POST /membership/activate "" "$TOKEN"); check "aktivasi tanpa KYC -> 422" "$c" "422"
+c=$(code PUT /profile/kyc "{\"nik\":\"320199$(printf '%010d' "$STAMP")\",\"phone_number\":\"081234567890\",\"address\":\"Jl. Merdeka 1\",\"job_title\":\"Wiraswasta\",\"monthly_income\":7500000,\"emergency_contact_name\":\"Siti\",\"emergency_contact_phone\":\"081298765432\"}" "$TOKEN")
+check "isi KYC -> 200" "$c" "200"
+c=$(code POST /membership/activate "" "$TOKEN"); check "aktivasi keanggotaan -> 201" "$c" "201"
+c=$(code POST /membership/activate "" "$TOKEN"); check "aktivasi kedua -> 409" "$c" "409"
 
 # --- Fase 2: simpanan -------------------------------------------------
 echo "-- Fase 2: simpanan"
@@ -118,19 +97,14 @@ check "  status awal pending" "$(jval "$(body)" status)" "pending"
 c=$(code POST /savings/deposit "{\"account_id\":999999,\"amount\":5000000,\"payment_method\":\"x\"}" "$TOKEN")
 check "setor ke rekening asing -> 404" "$c" "404"
 
-# admin: daftar, verifikasi email, lalu naikkan role lewat SQL
-c=$(code POST /register "{\"nama_lengkap\":\"Admin Koperasi\",\"email\":\"$ADMIN\",\"password\":\"$PW\"}")
-AOTP=$(otp_for "$ADMIN")
-code POST /verify-email "{\"email\":\"$ADMIN\",\"otp\":\"$AOTP\"}" >/dev/null
-ADMIN_TOKEN=$(jval "$(body)" token)
+# admin: daftar di JDC Account, login SSO, lalu naikkan role koperasi lewat SQL
+idp_register "$ADMIN_TOKEN" "Admin Koperasi" "$ADMIN" "$PW" >/dev/null
+app_login "$ADMIN_TOKEN" koperasi >/dev/null
 
 c=$(code GET /admin/users "" "$TOKEN"); check "anggota akses /admin/users -> 403" "$c" "403"
 
-"$MYSQL" -u root -h 127.0.0.1 koperasi_digital \
-  -e "UPDATE users SET role='super_admin' WHERE email='$ADMIN';" 2>/dev/null
+"$MYSQL" -u root -h 127.0.0.1 koperasi_digital   -e "UPDATE users SET role='super_admin' WHERE email='$ADMIN';" 2>/dev/null
 
-c=$(code POST /login "{\"email\":\"$ADMIN\",\"password\":\"$PW\"}")
-ADMIN_TOKEN=$(jval "$(body)" token)
 c=$(code GET /admin/users "" "$ADMIN_TOKEN"); check "admin akses /admin/users -> 200" "$c" "200"
 check "  password_hash TIDAK bocor" "$(printf '%s' "$(body)" | grep -c password_hash)" "0"
 check "  berpaginasi (ada per_page)" "$(printf '%s' "$(body)" | grep -c per_page)" "1"
@@ -191,7 +165,7 @@ check "admin GET /admin/savings/withdraw-requests -> 200" "$c" "200"
 # --- Fase 3: KYC ------------------------------------------------------
 echo "-- Fase 3: KYC"
 c=$(code GET /profile/kyc "" "$TOKEN"); check "KYC kosong -> 200 objek kosong" "$c" "200"
-c=$(code PUT /profile/kyc "{\"nik\":\"320123456789012${STAMP: -1}\",\"phone_number\":\"081234567890\",\"address\":\"Jl. Merdeka 1\",\"job_title\":\"Wiraswasta\",\"monthly_income\":7500000,\"emergency_contact_name\":\"Siti\",\"emergency_contact_phone\":\"081298765432\"}" "$TOKEN")
+c=$(code PUT /profile/kyc "{\"nik\":\"320188$(printf '%010d' "$STAMP")\",\"phone_number\":\"081234567890\",\"address\":\"Jl. Merdeka 1\",\"job_title\":\"Wiraswasta\",\"monthly_income\":7500000,\"emergency_contact_name\":\"Siti\",\"emergency_contact_phone\":\"081298765432\"}" "$TOKEN")
 check "simpan KYC -> 200" "$c" "200"
 c=$(code PUT /profile/kyc '{"nik":"123","phone_number":"081234567890","address":"x","job_title":"y","monthly_income":1,"emergency_contact_name":"z","emergency_contact_phone":"081234567890"}' "$TOKEN")
 check "NIK bukan 16 digit -> 400" "$c" "400"
@@ -270,11 +244,12 @@ c=$(code POST /admin/gold/price '{"buy_price_per_gram":100,"sell_price_per_gram"
 check "harga jual > harga beli -> 400" "$c" "400"
 
 # --- logout -----------------------------------------------------------
-echo "-- Penutup: logout & blocklist"
-c=$(code POST /logout "" "$TOKEN"); check "logout -> 200" "$c" "200"
-c=$(code GET /profile "" "$TOKEN"); check "token pasca-logout -> 401" "$c" "401"
+echo "-- Penutup: logout global"
+c=$(code POST /sso/logout "" "$TOKEN"); check "logout -> 200" "$c" "200"
+check "  redirect ke end_session JDC Account" "$(jval "$(body)" redirect_url | cut -d'?' -f1)" "$ORIGIN/account/oauth/logout"
+c=$(code GET /profile "" "$TOKEN"); check "sesi pasca-logout -> 401" "$c" "401"
 
-rm -f /tmp/body.$$
+rm -f /tmp/body.$$; rm -rf "$TMPD"
 echo
 printf 'HASIL: \033[32m%d lulus\033[0m, \033[31m%d gagal\033[0m\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

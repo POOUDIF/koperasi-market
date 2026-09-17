@@ -33,5 +33,5 @@ $db['default'] = array(
     'compress' => FALSE,
     'stricton' => FALSE,
     'failover' => array(),
-    'save_queries' => (env('APP_ENV') !== 'production'),
+    'save_queries' => (ENVIRONMENT !== 'production'),
 );

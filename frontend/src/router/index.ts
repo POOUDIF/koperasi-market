@@ -1,47 +1,53 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import api, { getToken } from '@/lib/api';
+import api from '@/lib/api';
+import { redirectToLogin } from '@/lib/sso';
 import { ADMIN_ROLES, type User } from '@/types/api';
 
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean;
+    /** Hanya untuk akun yang sudah aktivasi keanggotaan koperasi. */
+    requiresMember?: boolean;
     requiresAdmin?: boolean;
-    guestOnly?: boolean;
     title?: string;
   }
 }
 
+const member = { requiresAuth: true, requiresMember: true } as const;
+
 const router = createRouter({
-  history: createWebHistory('/koperasi-market/'),
+  // BASE_URL = '/koperasi/' (vite.config.ts) — routing berbasis path satu domain.
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: '/', redirect: '/dashboard' },
+    // URL lama sebelum SSO: login kini di JDC Account, guard yang mengarahkan.
+    { path: '/login', redirect: '/dashboard' },
+    { path: '/register', redirect: '/dashboard' },
+    { path: '/verify-otp', redirect: '/dashboard' },
     {
-      path: '/',
-      redirect: '/login',
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/views/auth/LoginView.vue'),
-      meta: { guestOnly: true, title: 'Masuk' },
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/auth/RegisterView.vue'),
-      meta: { guestOnly: true, title: 'Daftar' },
-    },
-    {
-      path: '/verify-otp',
-      name: 'verify-otp',
-      component: () => import('@/views/auth/VerifyOtpView.vue'),
-      meta: { guestOnly: true, title: 'Verifikasi Email' },
+      path: '/auth/error',
+      name: 'auth-error',
+      component: () => import('@/views/auth/AuthErrorView.vue'),
+      meta: { title: 'Gagal Masuk' },
     },
     {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('@/views/dashboard/DashboardHome.vue'),
-      meta: { requiresAuth: true, title: 'Dashboard' },
+      meta: { ...member, title: 'Dashboard' },
+    },
+    {
+      path: '/dashboard/membership',
+      name: 'membership',
+      component: () => import('@/views/dashboard/MembershipView.vue'),
+      meta: { requiresAuth: true, title: 'Keanggotaan Koperasi' },
+    },
+    {
+      path: '/dashboard/security',
+      name: 'security',
+      component: () => import('@/views/dashboard/SecurityView.vue'),
+      meta: { requiresAuth: true, title: 'Keamanan Transaksi' },
     },
     {
       path: '/dashboard/kyc',
@@ -53,44 +59,51 @@ const router = createRouter({
       path: '/dashboard/savings',
       name: 'savings',
       component: () => import('@/views/dashboard/SavingsView.vue'),
-      meta: { requiresAuth: true, title: 'Simpanan' },
+      meta: { ...member, title: 'Simpanan' },
     },
     {
       path: '/dashboard/financing',
       name: 'financing',
       component: () => import('@/views/dashboard/FinancingView.vue'),
-      meta: { requiresAuth: true, title: 'Pembiayaan' },
+      meta: { ...member, title: 'Pembiayaan' },
     },
     {
       path: '/dashboard/financing/:id/installments',
       name: 'financing-installments',
       component: () => import('@/views/dashboard/FinancingInstallmentsView.vue'),
-      meta: { requiresAuth: true, title: 'Jadwal Angsuran' },
+      meta: { ...member, title: 'Jadwal Angsuran' },
       props: (route) => ({ id: Number(route.params.id) }),
     },
     {
       path: '/dashboard/gold',
       name: 'gold',
       component: () => import('@/views/dashboard/GoldView.vue'),
-      meta: { requiresAuth: true, title: 'Emas Digital' },
+      meta: { ...member, title: 'Emas Digital' },
     },
     {
       path: '/dashboard/transactions',
       name: 'transactions-history',
       component: () => import('@/views/dashboard/TransactionsView.vue'),
-      meta: { requiresAuth: true, title: 'Riwayat Transaksi' },
+      meta: { ...member, title: 'Riwayat Transaksi' },
     },
     {
       path: '/dashboard/topup',
       name: 'topup',
       component: () => import('@/views/dashboard/TopUpView.vue'),
-      meta: { requiresAuth: true, title: 'Top-up Saldo' },
+      meta: { ...member, title: 'Top-up Saldo' },
     },
     {
       path: '/dashboard/notifications',
       name: 'notifications',
       component: () => import('@/views/dashboard/NotificationsView.vue'),
       meta: { requiresAuth: true, title: 'Notifikasi' },
+    },
+    {
+      path: '/pay/:id',
+      name: 'pay',
+      component: () => import('@/views/pay/PaymentConfirmView.vue'),
+      meta: { ...member, title: 'Konfirmasi Pembayaran' },
+      props: true,
     },
     {
       path: '/dashboard/admin',
@@ -144,47 +157,44 @@ const router = createRouter({
 
 /**
  * Guard global. Backend tetap sumber kebenaran otorisasi (401/403 di setiap
- * request) — guard di sini murni UX: cegah anggota biasa membuka layout admin,
- * dan cegah orang yang sudah login membuka halaman login/register lagi.
+ * request) — guard di sini murni UX.
  *
- * Diverifikasi lewat GET /profile langsung (bukan cuma percaya state Pinia)
- * supaya hard-refresh / buka-link-langsung ke rute admin tetap tervalidasi.
+ * Tanpa sesi → redirect penuh ke login SSO (JDC Account), lalu kembali ke
+ * halaman yang sama. Akun yang belum aktivasi keanggotaan diarahkan ke
+ * halaman aktivasi.
  */
 router.beforeEach(async (to) => {
-  const token = getToken();
-  const authStore = useAuthStore();
-
-  if (to.meta.guestOnly && token) {
-    return { name: 'dashboard' };
-  }
-
   if (!to.meta.requiresAuth) {
     return true;
   }
 
-  if (!token) {
-    return { name: 'login' };
-  }
+  const authStore = useAuthStore();
 
   if (!authStore.user) {
     try {
-      const { data } = await api.get<User>('/profile');
+      const { data } = await api.get<User>('/profile', { skipAuthRedirect: true });
       authStore.setUser(data);
     } catch {
       authStore.reset();
-      return { name: 'login' };
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      redirectToLogin(base + to.fullPath);
+      return false;
     }
   }
 
   if (to.meta.requiresAdmin && !ADMIN_ROLES.includes(authStore.user!.role)) {
-    return { name: 'dashboard' };
+    return { name: authStore.isMember ? 'dashboard' : 'membership' };
+  }
+
+  if (to.meta.requiresMember && !authStore.isMember) {
+    return { name: 'membership', query: { redirect: to.fullPath } };
   }
 
   return true;
 });
 
 router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} — Jawa Dwipa Cooperative` : 'Jawa Dwipa Cooperative';
+  document.title = to.meta.title ? `${to.meta.title} — Koperasi Digital JDC` : 'Koperasi Digital JDC';
 });
 
 export default router;

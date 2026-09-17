@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import AppLogo from '@/components/AppLogo.vue';
+import AppLogo from '@jdc/ui/vue/AppLogo.vue';
+import AppSwitcher from '@jdc/ui/vue/AppSwitcher.vue';
+import { ACCOUNT_URL } from '@/lib/sso';
 import { useAuthStore } from '@/stores/auth';
 import { useLogout } from '@/composables/useAuth';
 import { useUnreadNotificationCount } from '@/composables/useNotifications';
@@ -13,16 +15,23 @@ const logoutMutation = useLogout();
 const mobileNavOpen = ref(false);
 const unreadCountQuery = useUnreadNotificationCount();
 
-const memberLinks = [
-  { to: '/dashboard', label: 'Dashboard', icon: '🏠' },
-  { to: '/dashboard/savings', label: 'Simpanan', icon: '🏦' },
-  { to: '/dashboard/financing', label: 'Pembiayaan', icon: '📋' },
-  { to: '/dashboard/gold', label: 'Emas Digital', icon: '🥇' },
-  { to: '/dashboard/transactions', label: 'Riwayat Transaksi', icon: '📜' },
-  { to: '/dashboard/topup', label: 'Top-up Saldo', icon: '💳' },
+const allMemberLinks = [
+  { to: '/dashboard', label: 'Dashboard', icon: '🏠', memberOnly: true },
+  { to: '/dashboard/membership', label: 'Aktivasi Keanggotaan', icon: '⭐', nonMemberOnly: true },
+  { to: '/dashboard/savings', label: 'Simpanan', icon: '🏦', memberOnly: true },
+  { to: '/dashboard/financing', label: 'Pembiayaan', icon: '📋', memberOnly: true },
+  { to: '/dashboard/gold', label: 'Emas Digital', icon: '🥇', memberOnly: true },
+  { to: '/dashboard/transactions', label: 'Riwayat Transaksi', icon: '📜', memberOnly: true },
+  { to: '/dashboard/topup', label: 'Top-up Saldo', icon: '💳', memberOnly: true },
   { to: '/dashboard/notifications', label: 'Notifikasi', icon: '🔔' },
   { to: '/dashboard/kyc', label: 'Profil KYC', icon: '🪪' },
+  { to: '/dashboard/security', label: 'Keamanan & PIN', icon: '🔐' },
 ];
+
+// Akun JDC yang belum aktivasi keanggotaan hanya melihat menu yang bisa dipakainya.
+const memberLinks = computed(() =>
+  allMemberLinks.filter((l) => (authStore.isMember ? !l.nonMemberOnly : !l.memberOnly)),
+);
 
 const adminLinks = [
   { to: '/dashboard/admin', label: 'Dashboard Admin', icon: '🛡️' },
@@ -76,9 +85,10 @@ function isActive(to: string) {
           </RouterLink>
         </div>
       </nav>
-      <div class="border-t border-primary-100 p-4">
+      <div class="border-t border-primary-100 p-4 space-y-2">
+        <a :href="ACCOUNT_URL" class="btn-secondary w-full">Akun JDC</a>
         <button class="btn-secondary w-full" :disabled="logoutMutation.isPending.value" @click="logoutMutation.mutate()">
-          Keluar
+          Keluar dari Semua Layanan
         </button>
       </div>
     </aside>
@@ -90,6 +100,7 @@ function isActive(to: string) {
         <span class="font-display text-sm font-bold text-primary-800">Jawa Dwipa</span>
       </div>
       <div class="flex items-center gap-1">
+        <AppSwitcher current="koperasi" />
         <RouterLink to="/dashboard/notifications" class="relative rounded-lg p-2 text-primary-700 hover:bg-primary-50" aria-label="Notifikasi">
           <span class="text-lg">🔔</span>
           <span
@@ -117,13 +128,15 @@ function isActive(to: string) {
       >
         <span>{{ link.icon }}</span>{{ link.label }}
       </RouterLink>
-      <button class="btn-secondary w-full mt-2" @click="logoutMutation.mutate()">Keluar</button>
+      <a :href="ACCOUNT_URL" class="btn-secondary w-full mt-2">Akun JDC</a>
+      <button class="btn-secondary w-full mt-2" @click="logoutMutation.mutate()">Keluar dari Semua Layanan</button>
     </div>
 
     <div class="lg:pl-64">
       <header class="hidden lg:flex sticky top-0 z-10 h-16 items-center justify-between border-b border-primary-100 bg-white/80 backdrop-blur px-8">
         <h1 class="font-display text-lg font-semibold text-primary-800">{{ $route.meta.title }}</h1>
         <div v-if="authStore.user" class="flex items-center gap-4">
+          <AppSwitcher current="koperasi" />
           <RouterLink to="/dashboard/notifications" class="relative rounded-lg p-2 text-primary-700 hover:bg-primary-50" aria-label="Notifikasi">
             <span class="text-lg">🔔</span>
             <span

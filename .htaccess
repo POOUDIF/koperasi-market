@@ -1,17 +1,104 @@
+# =====================================================================
+# jdc.shfopis.com — satu document root, routing BERBASIS PATH
+# (DOCS/ARSITEKTUR_SSO_COMPRO_MARKETPLACE.md §2.1)
+#
+#   /                  Company profile (statis)      public_html/compro/
+#   /account/*         JDC Account — IdP OIDC        account.php  (apps/account)
+#   /koperasi/api/v1/* API Koperasi Digital          index.php    (application)
+#   /koperasi/*        SPA Koperasi                  public_html/koperasi/
+#   /market/api/v1/*   API Marketplace               market.php   (apps/market)
+#   /market/*          SPA Marketplace               public_html/market/
+#
+# Asumsi: DOCUMENT_ROOT = folder repo ini (sama seperti deploy sebelumnya).
+# Flag END (bukan hanya L) WAJIB pada rewrite internal: tanpa itu .htaccess
+# per-direktori memproses ulang URI hasil rewrite dan jatuh ke aturan lain.
+# =====================================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+AddDefaultCharset utf-8
+ErrorDocument 404 /public_html/compro/404.html
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+  # Respons PHP menyetel header-nya sendiri (lebih ketat); setifempty tidak menimpanya.
+  Header always setifempty X-Frame-Options "DENY"
+  Header setifempty Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+  # Aset hasil build Vite ber-hash → boleh di-cache selamanya.
+  <If "%{REQUEST_URI} =~ m#/assets/[^/]+-[A-Za-z0-9_-]{8}\.(js|css|woff2?|svg|png|jpe?g|webp)$#">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </If>
+  <Else>
+    Header setifempty Cache-Control "no-cache"
+  </Else>
+</IfModule>
+
 RewriteEngine On
 
-# 1) Semua /api/v1/* tetap ditangani CI3 (front controller index.php), seperti sebelum ada frontend.
-#    Flag END (bukan cuma L) WAJIB: tanpa itu, .htaccess per-direktori mengulang
-#    proses rewrite dari atas setelah substitusi, dan URI baru "index.php" tidak lagi
-#    cocok RewriteCond di atas sehingga jatuh ke rule 3 (fallback SPA) alih-alih CI3.
-RewriteCond %{REQUEST_URI} ^/api/v1/
-RewriteRule ^ index.php [L,END]
+# CGI/FPM (umum di cPanel) membuang header Authorization — teruskan ke PHP.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-# 2) File statis hasil build Vue (frontend/dist disalin ke public_html/ oleh `npm run build`).
-RewriteCond %{REQUEST_URI} !^/api/v1/
+# ---------------------------------------------------------------------
+# 0) Pengamanan: kode, konfigurasi, kunci, dan file tersembunyi tidak
+#    pernah boleh disajikan. .well-known dikecualikan (discovery OIDC).
+# ---------------------------------------------------------------------
+RewriteRule ^(application|apps|shared|system|vendor|database|tests|signer-service|frontend|market-frontend|compro|packages|node_modules|DOCS|storage)(/|$) - [F,L]
+RewriteRule (^|/)\.(?!well-known/) - [F,L]
+RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|server\.php|[^/]+\.md|[^/]+\.sh)$ - [F,L]
+RewriteCond %{ENV:REDIRECT_STATUS} ^$
+RewriteRule ^(index|account|market)\.php - [F,L]
+
+# Permintaan internal (ErrorDocument / hasil rewrite) boleh membaca public_html;
+# akses langsung dari luar tidak.
+RewriteCond %{ENV:REDIRECT_STATUS} !^$
+RewriteRule ^public_html/ - [END]
+RewriteRule ^public_html(/|$) - [R=404,L]
+
+# ---------------------------------------------------------------------
+# 1) Kompatibilitas URL lama (sebelum SSO & path per layanan)
+# ---------------------------------------------------------------------
+RewriteRule ^api/v1/(.*)$ /koperasi/api/v1/$1 [R=308,L]
+RewriteRule ^(login|register|verify-otp)/?$ /koperasi/dashboard [R=301,L]
+RewriteRule ^dashboard(/.*)?$ /koperasi/dashboard$1 [R=301,L]
+RewriteRule ^koperasi-market(/.*)?$ /koperasi$1 [R=301,L]
+RewriteRule ^(koperasi|market)$ /$1/ [R=301,L]
+
+# ---------------------------------------------------------------------
+# 2) API (CodeIgniter 3)
+# ---------------------------------------------------------------------
+RewriteRule ^koperasi/api/v1(/|$) index.php [END]
+RewriteRule ^market/api/v1(/|$) market.php [END]
+
+# ---------------------------------------------------------------------
+# 3) JDC Account — aset statis hasil build, sisanya ke IdP
+# ---------------------------------------------------------------------
 RewriteCond %{DOCUMENT_ROOT}/public_html%{REQUEST_URI} -f
-RewriteRule ^(.*)$ public_html/$1 [L,END]
+RewriteRule ^account/assets/ public_html%{REQUEST_URI} [END]
+RewriteRule ^account(/|$) account.php [END]
 
-# 3) Sisanya (route client-side Vue Router: /login, /dashboard, /dashboard/gold, dst) -> index.html SPA.
-RewriteCond %{REQUEST_URI} !^/api/v1/
-RewriteRule ^ public_html/index.html [L,END]
+# ---------------------------------------------------------------------
+# 4) SPA Koperasi & Marketplace — file statis, lainnya fallback index.html
+# ---------------------------------------------------------------------
+RewriteCond %{DOCUMENT_ROOT}/public_html%{REQUEST_URI} -f
+RewriteRule ^(koperasi|market)/ public_html%{REQUEST_URI} [END]
+RewriteRule ^(koperasi|market)/ public_html/$1/index.html [END]
+
+# ---------------------------------------------------------------------
+# 5) Company profile (halaman statis per folder)
+# ---------------------------------------------------------------------
+RewriteCond %{DOCUMENT_ROOT}/public_html/compro%{REQUEST_URI} -f
+RewriteRule ^ public_html/compro%{REQUEST_URI} [END]
+
+RewriteCond %{REQUEST_URI} /$
+RewriteCond %{DOCUMENT_ROOT}/public_html/compro%{REQUEST_URI}index.html -f
+RewriteRule ^ public_html/compro%{REQUEST_URI}index.html [END]
+
+RewriteCond %{DOCUMENT_ROOT}/public_html/compro%{REQUEST_URI}/index.html -f
+RewriteRule ^(.*)$ /$1/ [R=301,L]
+
+RewriteRule ^ - [R=404,L]

@@ -11,16 +11,17 @@ class Saving_model extends MY_Model {
 
     /* ------------------------------------------------------------ produk */
 
+    /** Produk sistem (rekening penampung marketplace) tidak pernah terlihat oleh anggota. */
     public function find_product($id) {
         return $this->row(
             "SELECT id, name, akad_type, min_deposit, profit_sharing_ratio, is_mandatory
-               FROM savings_products WHERE id = ? LIMIT 1", array($id));
+               FROM savings_products WHERE id = ? AND is_system = 0 LIMIT 1", array($id));
     }
 
     public function get_products() {
         $rows = $this->q(
             "SELECT id, name, akad_type, min_deposit, profit_sharing_ratio, is_mandatory
-               FROM savings_products ORDER BY id ASC")->result_array();
+               FROM savings_products WHERE is_system = 0 ORDER BY id ASC")->result_array();
 
         return array_map(function ($p) {
             return array(
@@ -36,7 +37,7 @@ class Saving_model extends MY_Model {
 
     /** Produk yang memicu pembukaan rekening otomatis saat registrasi. */
     public function get_mandatory_products() {
-        return $this->q("SELECT id FROM savings_products WHERE is_mandatory = 1 ORDER BY id ASC")->result_array();
+        return $this->q("SELECT id FROM savings_products WHERE is_mandatory = 1 AND is_system = 0 ORDER BY id ASC")->result_array();
     }
 
     /* ---------------------------------------------------------- rekening */
